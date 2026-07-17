@@ -10,6 +10,7 @@ import {
   DEMO_REVISED_EXPLANATION,
   SAMPLE_LESSON,
 } from "../src/lib/domain/sample-lesson";
+import { assertRepairMatchesDiagnosis } from "../src/lib/domain/repair";
 import {
   DEMO_CHALLENGE,
   DEMO_DIAGNOSIS,
@@ -18,6 +19,12 @@ import {
 } from "../src/lib/fixtures/demo-fallback";
 
 const STORAGE_KEY = "recall.session.v1";
+
+const ALL_CORRECT_FIRST_EXPLANATION =
+  "Correlation describes how two variables vary together. An association can have several explanations, so a causal conclusion requires evidence that rules out alternatives.";
+
+const TRANSFER_REVISED_EXPLANATION =
+  "I would first test whether holiday demand, shared promotions, timing, or chance raised both products' sales, then seek controlled or longitudinal evidence before claiming that either product caused the other to sell.";
 
 const ALL_CORRECT_DIAGNOSIS = DiagnosisSchema.parse({
   nodes: [
@@ -66,11 +73,12 @@ const TRANSFER_REPAIR = RepairResultSchema.parse({
       "The transfer response preserves this source-supported reasoning link.",
   })),
   overallStatus: "repaired",
-  before: DEMO_FIRST_EXPLANATION,
-  after: DEMO_REVISED_EXPLANATION,
-  recallCard:
-    "A causal claim needs evidence that rules out credible alternative explanations.",
+  before: ALL_CORRECT_FIRST_EXPLANATION,
+  after: TRANSFER_REVISED_EXPLANATION,
+  recallCard: ALL_CORRECT_DIAGNOSIS.nodes[2]!.claim,
 });
+
+assertRepairMatchesDiagnosis(ALL_CORRECT_DIAGNOSIS, TRANSFER_REPAIR);
 
 function success(data: unknown) {
   return { ok: true, data, fallback: false };
@@ -85,6 +93,12 @@ async function mockDemoApi(
   options: { failDiagnosisOnce?: boolean; allCorrect?: boolean } = {},
 ) {
   let diagnosisAttempts = 0;
+  const expectedFirstExplanation = options.allCorrect
+    ? ALL_CORRECT_FIRST_EXPLANATION
+    : DEMO_FIRST_EXPLANATION;
+  const expectedRevisedExplanation = options.allCorrect
+    ? TRANSFER_REVISED_EXPLANATION
+    : DEMO_REVISED_EXPLANATION;
 
   await page.route("**/api/learn", async (route) => {
     const request = LearningRequestSchema.parse(route.request().postDataJSON());
@@ -98,7 +112,7 @@ async function mockDemoApi(
     if (request.operation === "diagnose") {
       diagnosisAttempts += 1;
       expect(request.challenge).toEqual(DEMO_CHALLENGE);
-      expect(request.firstExplanation).toBe(DEMO_FIRST_EXPLANATION);
+      expect(request.firstExplanation).toBe(expectedFirstExplanation);
       if (options.failDiagnosisOnce && diagnosisAttempts === 1) {
         await route.fulfill({
           status: 503,
@@ -122,8 +136,8 @@ async function mockDemoApi(
       return;
     }
 
-    expect(request.firstExplanation).toBe(DEMO_FIRST_EXPLANATION);
-    expect(request.revisedExplanation).toBe(DEMO_REVISED_EXPLANATION);
+    expect(request.firstExplanation).toBe(expectedFirstExplanation);
+    expect(request.revisedExplanation).toBe(expectedRevisedExplanation);
     expect(request.diagnosis).toEqual(
       options.allCorrect ? ALL_CORRECT_DIAGNOSIS : DEMO_DIAGNOSIS,
     );
@@ -138,9 +152,12 @@ async function startDemo(page: Page) {
   await expect(page.getByRole("heading", { name: DEMO_CHALLENGE.prompt })).toBeVisible();
 }
 
-async function reachDiagnosis(page: Page) {
+async function reachDiagnosis(
+  page: Page,
+  firstExplanation = DEMO_FIRST_EXPLANATION,
+) {
   await startDemo(page);
-  await page.getByLabel(/your explanation/i).fill(DEMO_FIRST_EXPLANATION);
+  await page.getByLabel(/your explanation/i).fill(firstExplanation);
   await page.getByRole("button", { name: /reveal my blind spot/i }).click();
 }
 
@@ -232,7 +249,7 @@ test("an all-correct diagnosis produces a successful transfer result", async ({
   page,
 }) => {
   await mockDemoApi(page, { allCorrect: true });
-  await reachDiagnosis(page);
+  await reachDiagnosis(page, ALL_CORRECT_FIRST_EXPLANATION);
 
   await expect(
     page.getByRole("heading", { name: /no clear misconception found/i }),
@@ -240,11 +257,20 @@ test("an all-correct diagnosis produces a successful transfer result", async ({
   await expect(page.getByText("Transfer question", { exact: true })).toBeVisible();
   await expect(page.getByLabel(/highest-priority learning gap/i)).toHaveCount(0);
   await page.getByRole("button", { name: /work through this challenge/i }).click();
-  await page.getByLabel(/revised explanation/i).fill(DEMO_REVISED_EXPLANATION);
+  await page
+    .getByLabel(/revised explanation/i)
+    .fill(TRANSFER_REVISED_EXPLANATION);
   await page
     .getByRole("button", { name: /check my repaired understanding/i })
     .click();
 
   await expect(page.getByRole("heading", { name: /transfer confirmed/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /recall card/i })).toBeVisible();
+  await expect(page.getByText(TRANSFER_REPAIR.before)).toBeVisible();
+  await expect(page.getByText(TRANSFER_REPAIR.after)).toBeVisible();
+  await expect(
+    page
+      .getByLabel(/recall card/i)
+      .getByText(TRANSFER_REPAIR.recallCard!, { exact: true }),
+  ).toBeVisible();
 });
