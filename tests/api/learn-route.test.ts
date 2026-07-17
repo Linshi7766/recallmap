@@ -178,6 +178,23 @@ describe("POST /api/learn", () => {
     expect(await body(response)).toEqual({ ok: true, data: DEMO_CHALLENGE, fallback: true });
   });
 
+  it("uses fallback for an exact demo request after invalid model output", async () => {
+    const post = createLearnPost(operations({
+      generateChallenge: vi.fn(async () => {
+        throw new StructuredModelError("MODEL_OUTPUT_INVALID");
+      }),
+    }));
+
+    const response = await post(request(challengeRequest()));
+
+    expect(response.status).toBe(200);
+    expect(await body(response)).toEqual({
+      ok: true,
+      data: DEMO_CHALLENGE,
+      fallback: true,
+    });
+  });
+
   it("returns exact diagnose and verify fallback shapes after their live operations fail", async () => {
     const post = createLearnPost(operations({
       diagnoseExplanation: vi.fn(async () => { throw new ModelUnavailableError(); }),
@@ -288,7 +305,7 @@ describe("POST /api/learn", () => {
     const unexpectedPost = createLearnPost(operations({
       generateChallenge: vi.fn(async () => { throw new Error(secret); }),
     }));
-    const unexpected = await unexpectedPost(request({ ...challengeRequest(), source: { ...SAMPLE_LESSON, kind: "pasted" } }));
+    const unexpected = await unexpectedPost(request(challengeRequest()));
 
     const [refusalBody, unavailableBody, unexpectedBody] = await Promise.all([
       body(refusal), body(unavailable), body(unexpected),

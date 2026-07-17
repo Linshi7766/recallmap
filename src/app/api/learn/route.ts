@@ -126,6 +126,14 @@ function mappedFailure(error: unknown): Response {
   return failure("INTERNAL_ERROR", 500);
 }
 
+function canUseDemoFallback(error: unknown): boolean {
+  return (
+    error instanceof StructuredModelError &&
+    (error.code === "MODEL_UNAVAILABLE" ||
+      error.code === "MODEL_OUTPUT_INVALID")
+  );
+}
+
 export function createLearnPost(
   operations: LearningOperations = productionOperations,
 ): (request: Request) => Promise<Response> {
@@ -145,10 +153,7 @@ export function createLearnPost(
     try {
       return success(await dispatch(parsed, operations), false);
     } catch (error) {
-      if (
-        error instanceof StructuredModelError &&
-        error.code === "MODEL_REFUSED"
-      ) {
+      if (!canUseDemoFallback(error)) {
         return mappedFailure(error);
       }
 
