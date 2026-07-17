@@ -155,6 +155,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   outline-offset: 3px;
 }
 
+.stage-heading:focus { outline: none; }
+
 .secondary-button { border: 1px solid var(--line); background: white; color: var(--ink); }
 .secondary-button:hover:not(:disabled) { background: #f1f5f9; }
 

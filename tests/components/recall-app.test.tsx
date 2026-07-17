@@ -1,4 +1,5 @@
 import { StrictMode } from "react";
+import { readFileSync } from "node:fs";
 import {
   fireEvent,
   render,
@@ -233,6 +234,14 @@ it("introduces Recall as a guided misconception detector", async () => {
   });
   expect(heading).toBeInTheDocument();
   await waitFor(() => expect(heading).toHaveFocus());
+  expect(heading).toHaveClass("stage-heading");
+  const globalCss = readFileSync("src/app/globals.css", "utf8");
+  expect(globalCss).toMatch(
+    /\.stage-heading:focus\s*{\s*outline:\s*none;\s*}/,
+  );
+  expect(globalCss).toMatch(
+    /button:focus-visible,\s*input:focus-visible,\s*textarea:focus-visible,\s*summary:focus-visible\s*{\s*outline:\s*3px solid #c4b5fd;/,
+  );
   const start = screen.getByRole("button", { name: /start sample lesson/i });
   await waitFor(() => expect(start).toBeEnabled());
   expect(screen.getByText(/progress saved in this browser/i)).toBeVisible();

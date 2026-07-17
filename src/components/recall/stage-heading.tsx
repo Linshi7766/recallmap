@@ -15,7 +15,7 @@ export function StageHeading({ id, children }: StageHeadingProps) {
   }, []);
 
   return (
-    <h1 ref={headingRef} id={id} tabIndex={-1}>
+    <h1 ref={headingRef} id={id} className="stage-heading" tabIndex={-1}>
       {children}
     </h1>
   );
