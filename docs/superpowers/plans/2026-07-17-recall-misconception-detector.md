@@ -17,6 +17,7 @@
 - Accept only the built-in lesson or pasted text in the submission MVP. PDF upload is excluded until all acceptance criteria pass.
 - Normalize study text and limit it to 12,000 characters. Limit each student explanation to 80–4,000 characters.
 - Render three to five reasoning nodes. Evidence must be a verbatim substring of normalized source text.
+- Never fabricate a learning gap. `priorityNodeId` is nullable and may be `null` only when every reasoning node is `correct`; that path asks one transfer question.
 - Persist only the active learning session in browser `localStorage`; add no authentication or database.
 - Use exactly five internal client states: `start`, `teachback`, `diagnosis`, `repair`, and `result`. Present exactly four user-facing progress steps by mapping both `diagnosis` and `repair` to step 3, “Challenge”.
 - Preserve student input on API failure, timeout, rate limit, browser refresh, and back navigation.
@@ -285,6 +286,19 @@ describe("domain contracts", () => {
   it("requires three to five reasoning nodes", () => {
     expect(() => DiagnosisSchema.parse({ nodes: [], priorityNodeId: "n1" })).toThrow();
   });
+
+  it("accepts a null priority only when every node is correct", () => {
+    const nodes = [1, 2, 3].map((index) => ({
+      id: `node-${index}`,
+      claim: `Supported claim ${index}`,
+      status: "correct" as const,
+      diagnosis: "Supported by the supplied material",
+      evidence: "Correlation measures association.",
+      confidence: 0.9,
+    }));
+    expect(() => DiagnosisSchema.parse({ nodes, priorityNodeId: null })).not.toThrow();
+    expect(() => DiagnosisSchema.parse({ nodes, priorityNodeId: "node-1" })).toThrow();
+  });
 });
 ```
 
@@ -337,9 +351,16 @@ export const ReasoningNodeSchema = z.object({
 });
 export const DiagnosisSchema = z.object({
   nodes: z.array(ReasoningNodeSchema).min(3).max(5),
-  priorityNodeId: z.string().regex(/^node-[1-5]$/),
+  priorityNodeId: z.string().regex(/^node-[1-5]$/).nullable(),
 }).superRefine((value, ctx) => {
-  if (!value.nodes.some((node) => node.id === value.priorityNodeId && node.status !== "correct")) {
+  const nonCorrectNodes = value.nodes.filter((node) => node.status !== "correct");
+  const hasValidPriority = value.nodes.some(
+    (node) => node.id === value.priorityNodeId && node.status !== "correct",
+  );
+  if (nonCorrectNodes.length === 0 && value.priorityNodeId !== null) {
+    ctx.addIssue({ code: "custom", path: ["priorityNodeId"], message: "All-correct diagnoses require a null priority" });
+  }
+  if (nonCorrectNodes.length > 0 && !hasValidPriority) {
     ctx.addIssue({ code: "custom", path: ["priorityNodeId"], message: "Priority must reference a non-correct node" });
   }
 });
@@ -640,7 +661,7 @@ it("rejects diagnosis evidence that is absent from the source", async () => {
 });
 ```
 
-Also test that the challenge returns grounded evidence, the probe receives only the priority node, and repair verification compares the exact original and revised explanations.
+Also test that the challenge returns grounded evidence, the misconception probe receives only the priority node, an all-correct diagnosis passes `null` and produces a transfer/application question, and repair verification compares the exact original and revised explanations.
 
 - [ ] **Step 2: Run operation tests and verify failure**
 
@@ -679,7 +700,7 @@ export async function generateChallenge(input: { source: LessonSource; sessionId
 }
 ```
 
-Implement the other three functions with the same signature pattern. `diagnoseExplanation` validates every node's `evidence`. `generateChallengeProbe` receives the priority node object and relevant source. `verifyRepair` validates every updated node's evidence and must receive the original explanation, revised explanation, diagnosis, probe, and source.
+Implement the other three functions with the same signature pattern. `diagnoseExplanation` validates every node's `evidence`. `generateChallengeProbe` receives `priorityNode: ReasoningNode | null` and relevant source; when the node is `null`, its prompt generates one transfer/application question without implying an error or disclosing the answer. `verifyRepair` validates every updated node's evidence and must receive the original explanation, revised explanation, diagnosis, probe, and source.
 
 - [ ] **Step 5: Verify learning operations**
 
@@ -749,7 +770,7 @@ The route must:
 
 1. Parse JSON with `LearningRequestSchema`.
 2. Dispatch `generate_challenge`, `diagnose`, or `verify`.
-3. For `diagnose`, call `diagnoseExplanation`, find the priority node, then call `generateChallengeProbe`.
+3. For `diagnose`, call `diagnoseExplanation`, resolve the priority node or `null`, then call `generateChallengeProbe` so all-correct diagnoses take the transfer-question path.
 4. On model failure, return an exact demo fallback only when `getDemoFallback` returns a value.
 5. Otherwise map invalid input to 400, refusal to 422, rate limit/timeout/server error to 503, and unexpected error to 500.
 6. Never include stack traces, source text, student answers, or API keys in error responses.
@@ -888,6 +909,13 @@ it("shows a repaired before-and-after result", async () => {
   expect(await screen.findByRole("heading", { name: /understanding repaired/i })).toBeInTheDocument();
   expect(screen.getByText(/before → after/i)).toBeVisible();
 });
+
+it("uses a transfer question instead of inventing a gap for an all-correct answer", async () => {
+  // Return a diagnosis whose nodes are all correct and whose priorityNodeId is null.
+  expect(await screen.findByRole("heading", { name: /no clear misconception found/i })).toBeInTheDocument();
+  expect(screen.queryByLabelText(/highest-priority learning gap/i)).not.toBeInTheDocument();
+  expect(screen.getByText(/transfer question/i)).toBeVisible();
+});
 ```
 
 Add an accessibility assertion that every node includes visible text status and does not rely on color alone.
@@ -899,7 +927,7 @@ Expected: FAIL because diagnosis/repair/result components do not exist.
 
 - [ ] **Step 3: Implement the reasoning map**
 
-Render ordered nodes with `data-status`, a visible icon and label, the claim, diagnosis, confidence converted to a rounded percentage, and a `<blockquote>` for evidence. Mark the priority node with `aria-label="Highest-priority learning gap"`. Never hide low-confidence nodes; label confidence below 0.6 as “Tentative”.
+Render ordered nodes with `data-status`, a visible icon and label, the claim, diagnosis, confidence converted to a rounded percentage, and a `<blockquote>` for evidence. When `priorityNodeId` is non-null, mark that node with `aria-label="Highest-priority learning gap"`. When it is null, render the heading **No clear misconception found** and label the probe as a transfer question; do not mark any node as a learning gap. Never hide low-confidence nodes; label confidence below 0.6 as “Tentative”.
 
 - [ ] **Step 4: Implement diagnosis and repair stages**
 
@@ -1067,7 +1095,7 @@ Before recording the YouTube video, confirm all ten specification acceptance cri
 - [ ] A judge starts the built-in lesson without an account or personal API key.
 - [ ] The deployed five-stage Guided Focus flow completes successfully.
 - [ ] Diagnosis returns three to five typed nodes with source-verified evidence.
-- [ ] The challenge targets one misconception without disclosing a complete answer.
+- [ ] The challenge targets one misconception, or asks a transfer question for an all-correct diagnosis, without disclosing a complete answer or fabricating an error.
 - [ ] Verification compares the original and revised explanations visibly.
 - [ ] API failure and browser refresh preserve student work.
 - [ ] Unit, route, component, E2E, lint, audit, and production build gates pass.

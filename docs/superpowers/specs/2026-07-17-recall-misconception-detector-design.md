@@ -22,7 +22,7 @@ Recall follows a different sequence:
 
 1. Elicit the student's current mental model.
 2. Make the reasoning structure visible.
-3. Challenge one specific misconception without immediately giving away the answer.
+3. Challenge one specific misconception without immediately giving away the answer, or test transfer when the explanation is fully supported.
 4. Ask the student to reconstruct the explanation.
 5. Compare the two explanations and verify conceptual repair.
 
@@ -75,7 +75,7 @@ The student's explanation is represented as three to five ordered reasoning node
 
 Each node includes a concise explanation, a source excerpt, and a confidence level. The interface visually reserves green for supported reasoning, amber for incomplete reasoning, and red for a misconception.
 
-Recall selects the most instructionally important non-correct node and generates exactly one counterexample or Socratic question. It does not reveal a complete model answer at this stage.
+When at least one node is non-correct, Recall selects the most instructionally important gap and generates exactly one counterexample or Socratic question. When every node is correct, `priorityNodeId` is `null`; the interface displays **No clear misconception found** and asks one transfer question that tests the concept in a new context. Recall must never invent an error, and it does not reveal a complete model answer at this stage.
 
 ### Stage 4: Verify Repair
 
@@ -133,12 +133,12 @@ Output: lesson title, selected concept, open explanation prompt, and the source 
 #### `diagnoseExplanation`
 
 Input: source text, selected concept, prompt, and the student's first explanation.  
-Output: three to five ordered reasoning nodes, each containing status, claim, diagnosis, source evidence, and confidence; plus the identifier of the highest-priority gap.
+Output: three to five ordered reasoning nodes, each containing status, claim, diagnosis, source evidence, and confidence; plus the nullable identifier of the highest-priority gap. It is `null` only when every node is correct.
 
 #### `generateChallengeProbe`
 
-Input: the selected gap, relevant source evidence, and the student's explanation.  
-Output: one counterexample or Socratic question and a private evaluation target used during repair verification. It must not include a complete answer for the student.
+Input: the selected gap when one exists, relevant source evidence, and the student's explanation.
+Output: one counterexample or Socratic question for a gap, or one transfer question when the diagnosis is fully correct, plus a private evaluation target used during repair verification. It must not include a complete answer for the student.
 
 #### `verifyRepair`
 
@@ -269,7 +269,7 @@ The MVP is ready for submission only when all of the following are true:
 1. A new judge can start the built-in lesson without an account or API key.
 2. The four-stage Guided Focus flow completes successfully in the deployed application.
 3. The diagnosis produces three to five typed reasoning nodes with verified source evidence.
-4. The challenge targets the selected misconception without revealing a complete answer.
+4. The challenge targets the selected misconception, or asks a transfer question for an all-correct diagnosis, without revealing a complete answer or fabricating an error.
 5. Repair verification visibly compares the original and revised explanations.
 6. Invalid model output, API failure, and browser refresh do not erase the student's work.
 7. Automated tests cover schemas, state transitions, evidence verification, retry behavior, and the built-in lesson fixtures.
