@@ -77,11 +77,37 @@ const DIAGNOSIS: Diagnosis = {
 };
 
 const ALL_CORRECT_DIAGNOSIS: Diagnosis = {
-  nodes: DIAGNOSIS.nodes.map((node) => ({
-    ...node,
-    status: "correct" as const,
-    diagnosis: "This point is supported and accurately qualified.",
-  })),
+  nodes: [
+    {
+      id: "node-1",
+      claim: "Correlation describes variables moving together",
+      status: "correct",
+      diagnosis: "The explanation correctly describes association as co-variation.",
+      evidence: "Correlation measures how two variables vary together.",
+      confidence: 0.95,
+    },
+    {
+      id: "node-2",
+      claim: "Association alone does not establish causation",
+      status: "correct",
+      diagnosis:
+        "The explanation correctly distinguishes association from a causal mechanism.",
+      evidence:
+        "Correlation alone does not identify the mechanism that produced an association.",
+      confidence: 0.95,
+    },
+    {
+      id: "node-3",
+      claim:
+        "Credible causal inference requires additional evidence that rules out alternatives",
+      status: "correct",
+      diagnosis:
+        "The explanation correctly requires alternatives to be ruled out with added evidence.",
+      evidence:
+        "Establishing causation requires a credible design or additional evidence that rules out alternative explanations.",
+      confidence: 0.9,
+    },
+  ],
   priorityNodeId: null,
 };
 
@@ -396,6 +422,21 @@ describe("grounded learning operations", () => {
 
     const options = onlyCall(call);
     expect(diagnosis.priorityNodeId).toBeNull();
+    expect(diagnosis.nodes.map(({ claim, status }) => ({ claim, status }))).toEqual([
+      {
+        claim: "Correlation describes variables moving together",
+        status: "correct",
+      },
+      {
+        claim: "Association alone does not establish causation",
+        status: "correct",
+      },
+      {
+        claim:
+          "Credible causal inference requires additional evidence that rules out alternatives",
+        status: "correct",
+      },
+    ]);
     expect(options.input).toContain(
       `<student_explanation>\n${encodedPayload(ALL_CORRECT_EXPLANATION)}\n</student_explanation>`,
     );
