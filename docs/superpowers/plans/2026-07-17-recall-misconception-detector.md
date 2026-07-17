@@ -135,7 +135,7 @@ Then replace the generated scripts in `package.json` with:
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
-  "engines": { "node": ">=20.9.0" }
+  "engines": { "node": ">=20.19.0" }
 }
 ```
 
@@ -143,7 +143,7 @@ Keep the dependency blocks written by npm. Expected: `package-lock.json` is crea
 
 - [ ] **Step 2: Add strict framework and test configuration**
 
-Create `tsconfig.json` with `strict: true`, `noUncheckedIndexedAccess: true`, `jsx: "preserve"`, `moduleResolution: "bundler"`, and the alias `"@/*": ["./src/*"]`. Create `vitest.config.mts`:
+Create `tsconfig.json` with `strict: true`, `noUncheckedIndexedAccess: true`, `jsx: "react-jsx"`, `moduleResolution: "bundler"`, and the alias `"@/*": ["./src/*"]`. Create `vitest.config.mts`:
 
 ```ts
 import { defineConfig } from "vitest/config";
