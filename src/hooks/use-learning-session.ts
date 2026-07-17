@@ -189,6 +189,29 @@ export function useLearningSession() {
     }
   }, [transition]);
 
+  const beginRepair = useCallback(() => {
+    if (busyRef.current || sessionRef.current.stage !== "diagnosis") return;
+    setError(null);
+    transition({
+      type: "REVISED_EXPLANATION_CHANGED",
+      value: sessionRef.current.revisedExplanation,
+    });
+  }, [transition]);
+
+  const reviewReasoning = useCallback(() => {
+    if (busyRef.current) return;
+    setError(null);
+    let remainingTransitions = 2;
+    while (
+      sessionRef.current.stage !== "diagnosis" &&
+      sessionRef.current.stage !== "start" &&
+      remainingTransitions > 0
+    ) {
+      transition({ type: "BACK" });
+      remainingTransitions -= 1;
+    }
+  }, [transition]);
+
   const reset = useCallback(() => {
     if (busyRef.current) return;
     setError(null);
@@ -222,6 +245,8 @@ export function useLearningSession() {
     back,
     resume,
     backToTeachback,
+    beginRepair,
+    reviewReasoning,
     reset,
     changeFirstExplanation,
     changeRevisedExplanation,

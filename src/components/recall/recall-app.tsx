@@ -1,13 +1,22 @@
 "use client";
 
 import { useLearningSession } from "@/hooks/use-learning-session";
+import { DiagnosisStage } from "./diagnosis-stage";
 import { Progress } from "./progress";
+import { RepairStage } from "./repair-stage";
+import { ResultStage } from "./result-stage";
 import { StartStage } from "./start-stage";
 import { TeachbackStage } from "./teachback-stage";
 
 export function RecallApp() {
   const learning = useLearningSession();
   const { session } = learning;
+  const hasDiagnosis = session.diagnosis !== null && session.probe !== null;
+  const cannotRenderStage =
+    (session.stage === "teachback" && session.challenge === null) ||
+    (["diagnosis", "repair", "result"].includes(session.stage) &&
+      !hasDiagnosis) ||
+    (session.stage === "result" && session.repair === null);
 
   return (
     <main className="shell">
@@ -38,26 +47,49 @@ export function RecallApp() {
             onBack={learning.back}
           />
         ) : null}
-        {session.stage !== "start" && session.stage !== "teachback" ? (
-          <section className="stage stage-placeholder" aria-live="polite">
-            <p className="eyebrow">ANALYSIS READY</p>
-            <h1>Your reasoning map is ready for the next step.</h1>
+        {session.stage === "diagnosis" && session.diagnosis && session.probe ? (
+          <DiagnosisStage
+            diagnosis={session.diagnosis}
+            probe={session.probe}
+            onContinue={learning.beginRepair}
+            onBack={learning.back}
+          />
+        ) : null}
+        {session.stage === "repair" && session.diagnosis && session.probe ? (
+          <RepairStage
+            diagnosis={session.diagnosis}
+            probe={session.probe}
+            firstExplanation={session.firstExplanation}
+            revisedExplanation={session.revisedExplanation}
+            busy={learning.busy}
+            error={learning.error}
+            onChange={learning.changeRevisedExplanation}
+            onVerify={learning.verify}
+            onBack={learning.back}
+          />
+        ) : null}
+        {session.stage === "result" &&
+        session.diagnosis &&
+        session.probe &&
+        session.repair ? (
+          <ResultStage
+            diagnosis={session.diagnosis}
+            repair={session.repair}
+            onReview={learning.reviewReasoning}
+            onReset={learning.reset}
+          />
+        ) : null}
+        {cannotRenderStage ? (
+          <section className="stage stage-guard" role="alert">
+            <p className="eyebrow">SESSION RECOVERY</p>
+            <h1>This step could not be restored.</h1>
             <p>
-              The visual analysis arrives in the next build. Your work is
-              safely preserved.
+              The saved lesson is missing information needed for this view.
+              Return to the start to continue safely.
             </p>
-            <div className="stage-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={learning.reset}
-              >
-                Start over
-              </button>
-              <button type="button" onClick={learning.backToTeachback}>
-                Back to my explanation
-              </button>
-            </div>
+            <button type="button" onClick={learning.reset}>
+              Return to start
+            </button>
           </section>
         ) : null}
       </div>

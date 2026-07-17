@@ -118,12 +118,17 @@ export const DEMO_REPAIR = deepFreeze(
         ...DEMO_DIAGNOSIS.nodes[0],
         previousStatus: "correct",
         status: "correct",
+        diagnosis:
+          "The revised explanation still correctly describes correlation as co-variation.",
         repairExplanation: "The revised explanation preserves this accurate observation.",
       },
       {
         ...DEMO_DIAGNOSIS.nodes[1],
         previousStatus: "misconception",
         status: "correct",
+        claim: "Correlation alone cannot establish causation.",
+        diagnosis:
+          "The revised explanation now distinguishes association from a causal mechanism.",
         repairExplanation:
           "The revision explains that association alone cannot establish causation.",
       },
@@ -131,6 +136,10 @@ export const DEMO_REPAIR = deepFreeze(
         ...DEMO_DIAGNOSIS.nodes[2],
         previousStatus: "incomplete",
         status: "correct",
+        claim:
+          "Common causes, reverse causation, selection bias, and chance are alternatives.",
+        diagnosis:
+          "The revision now names the main alternative explanations for an association.",
         repairExplanation:
           "The revision names common causes and other alternative explanations.",
       },

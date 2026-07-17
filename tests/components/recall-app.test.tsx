@@ -4,13 +4,24 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Page from "@/app/page";
 import { RecallApp } from "@/components/recall/recall-app";
 import { Progress } from "@/components/recall/progress";
-import { SAMPLE_LESSON } from "@/lib/domain/sample-lesson";
-import type { Challenge, LessonSource } from "@/lib/domain/contracts";
+import {
+  DEMO_FIRST_EXPLANATION,
+  DEMO_REVISED_EXPLANATION,
+  SAMPLE_LESSON,
+} from "@/lib/domain/sample-lesson";
+import type {
+  Challenge,
+  Diagnosis,
+  LessonSource,
+  Probe,
+  RepairResult,
+} from "@/lib/domain/contracts";
 import type { LearningSession } from "@/lib/domain/session";
 import {
   DEMO_DIAGNOSIS,
@@ -40,6 +51,101 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 function challengeResponse(challenge: Challenge = CHALLENGE): Response {
   return jsonResponse({ ok: true, data: challenge, fallback: false });
+}
+
+function diagnosisResponse(
+  diagnosis: Diagnosis = DEMO_DIAGNOSIS,
+  probe: Probe = DEMO_PROBE,
+): Response {
+  return jsonResponse({
+    ok: true,
+    data: { diagnosis, probe },
+    fallback: false,
+  });
+}
+
+function repairResponse(repair: RepairResult = DEMO_REPAIR): Response {
+  return jsonResponse({ ok: true, data: repair, fallback: false });
+}
+
+const ALL_CORRECT_DIAGNOSIS: Diagnosis = {
+  nodes: [
+    {
+      id: "node-1",
+      claim: "Correlation describes how two variables vary together.",
+      status: "correct",
+      diagnosis: "This accurately defines what correlation measures.",
+      evidence: "Correlation measures how two variables vary together.",
+      confidence: 0.98,
+    },
+    {
+      id: "node-2",
+      claim: "An association can have several explanations.",
+      status: "correct",
+      diagnosis: "This correctly leaves room for reverse and common causes.",
+      evidence:
+        "An association may arise because one variable causes the other, because causation runs in the reverse direction, because a third variable affects both, because of selection bias, or because of chance.",
+      confidence: 0.93,
+    },
+    {
+      id: "node-3",
+      claim: "A causal conclusion requires evidence that rules out alternatives.",
+      status: "correct",
+      diagnosis: "This states the additional standard for a causal claim.",
+      evidence:
+        "Establishing causation requires a credible design or additional evidence that rules out alternative explanations.",
+      confidence: 0.91,
+    },
+  ],
+  priorityNodeId: null,
+};
+
+const TRANSFER_PROBE: Probe = {
+  question:
+    "Two unrelated products sell more during a holiday week. What evidence would you seek before claiming that one product caused the other to sell?",
+  evaluationTarget:
+    "Whether the learner transfers the need to rule out alternative explanations.",
+};
+
+function repairForStatus(
+  overallStatus: RepairResult["overallStatus"],
+): RepairResult {
+  if (overallStatus === "partial") {
+    return {
+      ...DEMO_REPAIR,
+      overallStatus,
+      nodes: DEMO_REPAIR.nodes.map((node, index) =>
+        index === 2
+          ? {
+              ...node,
+              claim: "A common cause is one possible alternative explanation.",
+              status: "incomplete" as const,
+              diagnosis:
+                "The revision adds a common cause but still omits other plausible alternatives.",
+            }
+          : node,
+      ),
+    };
+  }
+
+  if (overallStatus === "not_repaired") {
+    return {
+      ...DEMO_REPAIR,
+      overallStatus,
+      nodes: DEMO_REPAIR.nodes.map((node, index) =>
+        index === 1
+          ? {
+              ...node,
+              claim: DEMO_DIAGNOSIS.nodes[1].claim,
+              status: "misconception" as const,
+              diagnosis: DEMO_DIAGNOSIS.nodes[1].diagnosis,
+            }
+          : node,
+      ),
+    };
+  }
+
+  return DEMO_REPAIR;
 }
 
 function deferred<T>() {
@@ -316,60 +422,396 @@ it("continues a backed-out lesson with the exact prompt and answer without fetch
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
-const ADVANCED_SESSIONS = [
-  ["diagnosis", { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE }],
-  ["repair", { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE }],
-  [
-    "result",
-    { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE, repair: DEMO_REPAIR },
-  ],
-] as const;
+it("reveals the priority misconception, challenge, and non-color map semantics", async () => {
+  const tentativeDiagnosis: Diagnosis = {
+    ...DEMO_DIAGNOSIS,
+    nodes: DEMO_DIAGNOSIS.nodes.map((node, index) =>
+      index === 2 ? { ...node, confidence: 0.554 } : node,
+    ),
+  };
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(challengeResponse())
+    .mockResolvedValueOnce(diagnosisResponse(tentativeDiagnosis));
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
 
-it.each(ADVANCED_SESSIONS)(
-  "restored %s stage can return to the preserved teachback",
-  async (stage, data) => {
+  render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", { name: /start sample lesson/i }),
+  );
+  fireEvent.change(await screen.findByLabelText(/your explanation/i), {
+    target: { value: DEMO_FIRST_EXPLANATION },
+  });
+  await user.click(screen.getByRole("button", { name: /reveal my blind spot/i }));
+
+  const priorityClaim = await screen.findByText(/association proves causation/i);
+  const priorityNode = priorityClaim.closest("li");
+  expect(priorityNode).toHaveAttribute(
+    "aria-label",
+    "Highest-priority learning gap",
+  );
+  expect(priorityNode).toHaveAttribute("data-status", "misconception");
+  expect(screen.getByText(DEMO_PROBE.question)).toBeVisible();
+
+  const map = screen.getByRole("list", { name: /reasoning map/i });
+  const nodes = within(map).getAllByRole("listitem");
+  expect(nodes).toHaveLength(3);
+  expect(nodes[0]).not.toHaveAttribute("aria-label");
+  expect(nodes[2]).not.toHaveAttribute("aria-label");
+  expect(nodes.map((node) => node.getAttribute("data-status"))).toEqual([
+    "correct",
+    "misconception",
+    "incomplete",
+  ]);
+  for (const [index, label] of [
+    "Supported",
+    "Misconception",
+    "Incomplete",
+  ].entries()) {
+    expect(within(nodes[index]).getByText(label)).toBeVisible();
+    expect(within(nodes[index]).getByText("●", { exact: true })).toBeVisible();
+    expect(nodes[index].querySelector("blockquote")).toBeInTheDocument();
+  }
+  expect(within(nodes[2]).getByText("55% confidence")).toBeVisible();
+  expect(within(nodes[2]).getByText("Tentative")).toBeVisible();
+});
+
+it("moves from diagnosis to repair without losing the challenge or either explanation", async () => {
+  localStorage.setItem(
+    "recall.session.v1",
+    JSON.stringify(
+      createRestoredSession({
+        stage: "diagnosis",
+        diagnosis: DEMO_DIAGNOSIS,
+        probe: DEMO_PROBE,
+        revisedExplanation: DEMO_REVISED_EXPLANATION,
+      }),
+    ),
+  );
+  vi.stubGlobal("fetch", vi.fn());
+  const user = userEvent.setup();
+
+  render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", {
+      name: /work through this challenge/i,
+    }),
+  );
+
+  expect(screen.getByText(DEMO_PROBE.question)).toBeVisible();
+  const revised = screen.getByLabelText(/revised explanation/i);
+  expect(revised).toHaveAttribute("minlength", "80");
+  expect(revised).toHaveAttribute("maxlength", "4000");
+  expect(revised).toHaveValue(DEMO_REVISED_EXPLANATION);
+  const original = screen.getByText(/original answer/i).closest("details");
+  expect(original).not.toHaveAttribute("open");
+  expect(original).toHaveTextContent(LONG_EXPLANATION);
+
+  await user.click(screen.getByRole("button", { name: /back to reasoning map/i }));
+  expect(screen.getByText(/association proves causation/i)).toBeVisible();
+  await user.click(
+    screen.getByRole("button", { name: /work through this challenge/i }),
+  );
+  expect(screen.getByLabelText(/revised explanation/i)).toHaveValue(
+    DEMO_REVISED_EXPLANATION,
+  );
+});
+
+it("shows a repair counter and an inline minimum-length error", async () => {
+  localStorage.setItem(
+    "recall.session.v1",
+    JSON.stringify(
+      createRestoredSession({
+        stage: "repair",
+        diagnosis: DEMO_DIAGNOSIS,
+        probe: DEMO_PROBE,
+      }),
+    ),
+  );
+  vi.stubGlobal("fetch", vi.fn());
+  const user = userEvent.setup();
+
+  render(<RecallApp />);
+  const revised = await screen.findByLabelText(/revised explanation/i);
+  await user.type(revised, "Still too short");
+
+  expect(screen.getByText("15 / 4,000")).toBeVisible();
+  expect(screen.getByText(/65 more characters needed/i)).toBeVisible();
+  expect(revised).toHaveAttribute("aria-invalid", "true");
+  expect(
+    screen.getByRole("button", { name: /check my repaired understanding/i }),
+  ).toBeDisabled();
+});
+
+it("completes the mocked diagnosis, repair, and result flow", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(challengeResponse())
+    .mockResolvedValueOnce(diagnosisResponse())
+    .mockResolvedValueOnce(repairResponse());
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", { name: /start sample lesson/i }),
+  );
+  fireEvent.change(await screen.findByLabelText(/your explanation/i), {
+    target: { value: DEMO_FIRST_EXPLANATION },
+  });
+  await user.click(screen.getByRole("button", { name: /reveal my blind spot/i }));
+  await user.click(
+    await screen.findByRole("button", {
+      name: /work through this challenge/i,
+    }),
+  );
+  fireEvent.change(screen.getByLabelText(/revised explanation/i), {
+    target: { value: DEMO_REVISED_EXPLANATION },
+  });
+  await user.click(
+    screen.getByRole("button", { name: /check my repaired understanding/i }),
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: "Understanding repaired" }),
+  ).toBeVisible();
+  expect(screen.getByText("Before → After")).toBeVisible();
+  expect(screen.getByText(DEMO_REPAIR.before)).toBeVisible();
+  expect(screen.getByText(DEMO_REPAIR.after)).toBeVisible();
+  expect(screen.getByText(DEMO_REPAIR.recallCard)).toBeVisible();
+  const repairedChange = screen
+    .getByText("Previous: Misconception")
+    .closest("[aria-label='Status change']");
+  expect(repairedChange).not.toBeNull();
+  expect(within(repairedChange as HTMLElement).getByText("Current: Supported")).toBeVisible();
+  const repairedNode = repairedChange?.closest("li");
+  expect(repairedNode).not.toBeNull();
+  expect(
+    within(repairedNode as HTMLElement).getByRole("heading", {
+      name: "Correlation alone cannot establish causation.",
+    }),
+  ).toBeVisible();
+  expect(within(repairedNode as HTMLElement).getByText(
+    "The revised explanation now distinguishes association from a causal mechanism.",
+  )).toBeVisible();
+  expect(within(repairedNode as HTMLElement).getByText(
+    DEMO_REPAIR.nodes[1].repairExplanation,
+  )).toBeVisible();
+  expect(
+    within(repairedNode as HTMLElement).queryByRole("heading", {
+      name: "Association proves causation.",
+    }),
+  ).not.toBeInTheDocument();
+  expect(repairedNode).toHaveAttribute(
+    "aria-label",
+    "Previously highest-priority learning gap",
+  );
+  expect(within(repairedNode as HTMLElement).getByText("Repaired priority gap")).toBeVisible();
+  expect(
+    screen.getByRole("heading", {
+      name: "Common causes, reverse causation, selection bias, and chance are alternatives.",
+    }),
+  ).toBeVisible();
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+});
+
+it("uses a neutral transfer question instead of inventing an all-correct gap", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(challengeResponse())
+    .mockResolvedValueOnce(
+      diagnosisResponse(ALL_CORRECT_DIAGNOSIS, TRANSFER_PROBE),
+    );
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", { name: /start sample lesson/i }),
+  );
+  fireEvent.change(await screen.findByLabelText(/your explanation/i), {
+    target: { value: LONG_EXPLANATION },
+  });
+  await user.click(screen.getByRole("button", { name: /reveal my blind spot/i }));
+
+  expect(
+    await screen.findByRole("heading", {
+      name: "No clear misconception found",
+    }),
+  ).toBeVisible();
+  expect(
+    screen.queryByLabelText(/highest-priority learning gap/i),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("Transfer question")).toBeVisible();
+  expect(screen.getByText(TRANSFER_PROBE.question)).toBeVisible();
+  expect(screen.getAllByText("Supported")).toHaveLength(3);
+  expect(screen.queryByText("Misconception")).not.toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("button", { name: /work through this challenge/i }),
+  );
+  expect(screen.getByText("Transfer question")).toBeVisible();
+  expect(screen.getByLabelText(/revised explanation/i)).toBeVisible();
+});
+
+it("preserves the exact revised explanation when verification fails and retries it", async () => {
+  const pendingRetry = deferred<Response>();
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(challengeResponse())
+    .mockResolvedValueOnce(diagnosisResponse())
+    .mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ok: false,
+          error: {
+            code: "MODEL_UNAVAILABLE",
+            message: "Learning service is temporarily unavailable.",
+          },
+        },
+        503,
+      ),
+    )
+    .mockReturnValueOnce(pendingRetry.promise);
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", { name: /start sample lesson/i }),
+  );
+  fireEvent.change(await screen.findByLabelText(/your explanation/i), {
+    target: { value: DEMO_FIRST_EXPLANATION },
+  });
+  await user.click(screen.getByRole("button", { name: /reveal my blind spot/i }));
+  await user.click(
+    await screen.findByRole("button", {
+      name: /work through this challenge/i,
+    }),
+  );
+  const revised = screen.getByLabelText(/revised explanation/i);
+  fireEvent.change(revised, { target: { value: DEMO_REVISED_EXPLANATION } });
+  await user.click(
+    screen.getByRole("button", { name: /check my repaired understanding/i }),
+  );
+
+  const retry = await screen.findByRole("button", {
+    name: /retry verification/i,
+  });
+  expect(revised).toHaveValue(DEMO_REVISED_EXPLANATION);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Recall is temporarily unavailable. Please try again.",
+  );
+  expect(
+    JSON.parse(localStorage.getItem("recall.session.v1") ?? "{}"),
+  ).toMatchObject({
+    stage: "repair",
+    firstExplanation: DEMO_FIRST_EXPLANATION,
+    revisedExplanation: DEMO_REVISED_EXPLANATION,
+  });
+
+  fireEvent.click(retry);
+  fireEvent.click(retry);
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+  expect(retry).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: /checking the repair/i }),
+  ).toBeDisabled();
+  const retryBody = JSON.parse(
+    String((fetchMock.mock.calls[3][1] as RequestInit).body),
+  ) as { revisedExplanation: string };
+  expect(retryBody.revisedExplanation).toBe(DEMO_REVISED_EXPLANATION);
+});
+
+it.each([
+  ["partial", "A key gap is smaller"],
+  ["not_repaired", "This gap still needs work"],
+] as const)(
+  "uses restrained copy for a %s result",
+  async (overallStatus, heading) => {
     localStorage.setItem(
       "recall.session.v1",
-      JSON.stringify(createRestoredSession({ stage, ...data })),
+      JSON.stringify(
+        createRestoredSession({
+          stage: "result",
+          diagnosis: DEMO_DIAGNOSIS,
+          probe: DEMO_PROBE,
+          revisedExplanation: DEMO_REVISED_EXPLANATION,
+          repair: repairForStatus(overallStatus),
+        }),
+      ),
     );
     vi.stubGlobal("fetch", vi.fn());
-    const user = userEvent.setup();
 
     render(<RecallApp />);
-    await user.click(
-      await screen.findByRole("button", { name: /back to my explanation/i }),
-    );
 
-    expect(screen.getByRole("heading", { name: CHALLENGE.prompt })).toBeVisible();
-    expect(screen.getByLabelText(/your explanation/i)).toHaveValue(
-      LONG_EXPLANATION,
-    );
+    expect(
+      await screen.findByRole("heading", { name: heading }),
+    ).toBeVisible();
+    expect(screen.queryByText(/congratulations|great job|celebrate/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Understanding repaired")).not.toBeInTheDocument();
   },
 );
 
-it.each(ADVANCED_SESSIONS)(
-  "restored %s stage can start over without a blank trap",
-  async (stage, data) => {
-    localStorage.setItem(
-      "recall.session.v1",
-      JSON.stringify(createRestoredSession({ stage, ...data })),
-    );
-    vi.stubGlobal("fetch", vi.fn());
-    const user = userEvent.setup();
+it("reviews the diagnosis from a result without refetching or losing repair text", async () => {
+  localStorage.setItem(
+    "recall.session.v1",
+    JSON.stringify(
+      createRestoredSession({
+        stage: "result",
+        diagnosis: DEMO_DIAGNOSIS,
+        probe: DEMO_PROBE,
+        revisedExplanation: DEMO_REVISED_EXPLANATION,
+        repair: DEMO_REPAIR,
+      }),
+    ),
+  );
+  const fetchMock = vi.fn();
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
 
-    render(<RecallApp />);
-    await user.click(
-      await screen.findByRole("button", { name: /start over/i }),
-    );
+  render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", { name: /review my reasoning/i }),
+  );
 
-    expect(
-      screen.getByRole("button", { name: /start sample lesson/i }),
-    ).toBeEnabled();
-    expect(
-      screen.queryByText(/your reasoning map is ready/i),
-    ).not.toBeInTheDocument();
-  },
-);
+  expect(screen.getByText(/association proves causation/i)).toBeVisible();
+  expect(fetchMock).not.toHaveBeenCalled();
+  await user.click(
+    screen.getByRole("button", { name: /work through this challenge/i }),
+  );
+  expect(screen.getByLabelText(/revised explanation/i)).toHaveValue(
+    DEMO_REVISED_EXPLANATION,
+  );
+});
+
+it("starts a clean lesson from the result action", async () => {
+  localStorage.setItem(
+    "recall.session.v1",
+    JSON.stringify(
+      createRestoredSession({
+        stage: "result",
+        diagnosis: DEMO_DIAGNOSIS,
+        probe: DEMO_PROBE,
+        revisedExplanation: DEMO_REVISED_EXPLANATION,
+        repair: DEMO_REPAIR,
+      }),
+    ),
+  );
+  vi.stubGlobal("fetch", vi.fn());
+  const user = userEvent.setup();
+
+  render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", { name: /try another concept/i }),
+  );
+
+  expect(
+    screen.getByRole("button", { name: /start sample lesson/i }),
+  ).toBeEnabled();
+  expect(screen.queryByText(DEMO_REPAIR.recallCard)).not.toBeInTheDocument();
+});
 
 it("ignores corrupt or outdated persisted sessions", async () => {
   localStorage.setItem(

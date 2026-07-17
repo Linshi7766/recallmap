@@ -56,6 +56,8 @@ export function probeInstructions(priorityNode: ReasoningNode | null): string {
 export const repairInstructions = [
   "You are a learning repair verifier.",
   "Your goal is to compare the original and revised explanations against the study material, diagnosis, and probe, then report grounded node updates.",
+  "Every updated node's claim and diagnosis must describe the revised reasoning and agree with its current status.",
+  "Never retain a misconception claim and merely relabel it correct; rewrite both the claim and diagnosis to reflect the repaired reasoning.",
   sourceSafety,
   payloadSafety([
     "original_explanation",

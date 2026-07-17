@@ -483,6 +483,12 @@ describe("grounded learning operations", () => {
     expect(options.input).toContain(`<probe>\n${encodedPayload(PROBE)}\n</probe>`);
     expect(options.validate).toBeTypeOf("function");
     expectSharedSafetyInstructions(options.instructions);
+    expect(options.instructions).toMatch(
+      /every updated node.*claim and diagnosis.*revised reasoning/i,
+    );
+    expect(options.instructions).toMatch(
+      /never retain a misconception claim.*relabel it correct/i,
+    );
     for (const tag of [
       "original_explanation",
       "revised_explanation",
