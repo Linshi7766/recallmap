@@ -85,6 +85,10 @@ function atResult() {
   return learningSessionReducer(atRepair(), { type: "REPAIR_READY", repair: REPAIR });
 }
 
+function persistedResult(): Record<string, unknown> {
+  return JSON.parse(serializeSession(atResult())) as Record<string, unknown>;
+}
+
 describe("learning session", () => {
   it("moves from start to teachback only after a selected source receives a challenge", () => {
     const start = createLearningSession(SESSION_ID);
@@ -214,11 +218,68 @@ describe("learning session", () => {
   it("serializes and restores a valid session", () => {
     const session = atResult();
     expect(restoreSession(serializeSession(session))).toEqual(session);
+    expect(serializeSession(session)).toBe(serializeSession(session));
+
+    const returnedToStart = learningSessionReducer(
+      learningSessionReducer(
+        learningSessionReducer(learningSessionReducer(session, { type: "BACK" }), { type: "BACK" }),
+        { type: "BACK" },
+      ),
+      { type: "BACK" },
+    );
+    expect(restoreSession(serializeSession(returnedToStart))).toEqual(returnedToStart);
   });
 
-  it("returns null for corrupt, structurally invalid, and outdated stored sessions", () => {
+  it("returns null for corrupt, structurally invalid, invalid UUID, and outdated stored sessions", () => {
     expect(restoreSession("not-json")).toBeNull();
     expect(restoreSession(JSON.stringify({ version: 1, id: SESSION_ID }))).toBeNull();
+    const invalidUuid = persistedResult();
+    invalidUuid.id = "not-a-uuid";
+    expect(restoreSession(JSON.stringify(invalidUuid))).toBeNull();
     expect(restoreSession(JSON.stringify({ ...atResult(), version: 2 }))).toBeNull();
+  });
+
+  it("returns null for every invalid nested persisted value", () => {
+    const invalidSource = persistedResult();
+    invalidSource.source = { ...SAMPLE_LESSON, text: "too short" };
+    expect(restoreSession(JSON.stringify(invalidSource))).toBeNull();
+
+    const invalidChallenge = persistedResult();
+    invalidChallenge.challenge = { ...CHALLENGE, prompt: "too short" };
+    expect(restoreSession(JSON.stringify(invalidChallenge))).toBeNull();
+
+    const invalidDiagnosis = persistedResult();
+    invalidDiagnosis.diagnosis = { nodes: [], priorityNodeId: "node-1" };
+    expect(restoreSession(JSON.stringify(invalidDiagnosis))).toBeNull();
+
+    const invalidProbe = persistedResult();
+    invalidProbe.probe = { ...PROBE, question: "too short" };
+    expect(restoreSession(JSON.stringify(invalidProbe))).toBeNull();
+
+    const invalidRepair = persistedResult();
+    invalidRepair.repair = { ...REPAIR, recallCard: "too short" };
+    expect(restoreSession(JSON.stringify(invalidRepair))).toBeNull();
+  });
+
+  it("returns null for impossible advanced stage prerequisites", () => {
+    const invalidTeachback = persistedResult();
+    invalidTeachback.stage = "teachback";
+    invalidTeachback.source = null;
+    expect(restoreSession(JSON.stringify(invalidTeachback))).toBeNull();
+
+    const invalidDiagnosis = persistedResult();
+    invalidDiagnosis.stage = "diagnosis";
+    invalidDiagnosis.diagnosis = null;
+    expect(restoreSession(JSON.stringify(invalidDiagnosis))).toBeNull();
+
+    const invalidRepair = persistedResult();
+    invalidRepair.stage = "repair";
+    invalidRepair.probe = null;
+    expect(restoreSession(JSON.stringify(invalidRepair))).toBeNull();
+
+    const invalidResult = persistedResult();
+    invalidResult.stage = "result";
+    invalidResult.repair = null;
+    expect(restoreSession(JSON.stringify(invalidResult))).toBeNull();
   });
 });

@@ -53,6 +53,49 @@ export const LearningSessionSchema = z.object({
   probe: ProbeSchema.nullable(),
   revisedExplanation: z.string(),
   repair: RepairResultSchema.nullable(),
+}).superRefine((session, context) => {
+  const requiresChallenge = session.stage !== "start";
+  const requiresDiagnosis = ["diagnosis", "repair", "result"].includes(session.stage);
+
+  if (requiresChallenge && !session.source) {
+    context.addIssue({
+      code: "custom",
+      path: ["source"],
+      message: "This stage requires a source",
+    });
+  }
+
+  if (requiresChallenge && !session.challenge) {
+    context.addIssue({
+      code: "custom",
+      path: ["challenge"],
+      message: "This stage requires a challenge",
+    });
+  }
+
+  if (requiresDiagnosis && !session.diagnosis) {
+    context.addIssue({
+      code: "custom",
+      path: ["diagnosis"],
+      message: "This stage requires a diagnosis",
+    });
+  }
+
+  if (requiresDiagnosis && !session.probe) {
+    context.addIssue({
+      code: "custom",
+      path: ["probe"],
+      message: "This stage requires a probe",
+    });
+  }
+
+  if (session.stage === "result" && !session.repair) {
+    context.addIssue({
+      code: "custom",
+      path: ["repair"],
+      message: "The result stage requires repair data",
+    });
+  }
 });
 
 export function createLearningSession(id: string): LearningSession {
