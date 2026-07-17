@@ -17,6 +17,10 @@ const options = {
   safetyIdentifier: "session",
 };
 
+const SENTINEL_INSTRUCTIONS = "instructions-sentinel";
+const SENTINEL_INPUT = "input-sentinel";
+const SENTINEL_RAW_OUTPUT = "raw-output-sentinel";
+
 it("returns parsed structured output with the required Responses payload", async () => {
   const parse = vi.fn().mockResolvedValue({ output_parsed: { value: "ok" } });
 
@@ -131,5 +135,75 @@ it("returns MODEL_OUTPUT_INVALID after validation fails twice", async () => {
   await expect(callStructured({ ...options, parse, validate })).rejects.toMatchObject({
     code: "MODEL_OUTPUT_INVALID",
   } satisfies Partial<StructuredModelError>);
+  expect(parse).toHaveBeenCalledTimes(2);
+});
+
+it("redacts two invalid outputs while retaining the final validation failure", async () => {
+  const finalOutput = { value: { secret: SENTINEL_RAW_OUTPUT } };
+  const expectedFinalFailure = Output.safeParse(finalOutput);
+  if (expectedFinalFailure.success) {
+    throw new Error("Expected the final output to fail schema validation");
+  }
+  const parse = vi
+    .fn()
+    .mockResolvedValueOnce({ output_parsed: { value: 1 } })
+    .mockResolvedValueOnce({ output_parsed: finalOutput });
+
+  const error = await callStructured({
+    ...options,
+    instructions: SENTINEL_INSTRUCTIONS,
+    input: SENTINEL_INPUT,
+    parse,
+  }).catch((reason: unknown) => reason);
+
+  expect(error).toMatchObject({
+    code: "MODEL_OUTPUT_INVALID",
+    message: "MODEL_OUTPUT_INVALID",
+  } satisfies Partial<StructuredModelError>);
+  expect((error as StructuredModelError).cause).toBeInstanceOf(z.ZodError);
+  expect(((error as StructuredModelError).cause as z.ZodError).issues).toEqual(
+    expectedFinalFailure.error.issues,
+  );
+  expect((error as StructuredModelError).message).not.toContain(
+    SENTINEL_INSTRUCTIONS,
+  );
+  expect((error as StructuredModelError).message).not.toContain(SENTINEL_INPUT);
+  expect((error as StructuredModelError).message).not.toContain(
+    SENTINEL_RAW_OUTPUT,
+  );
+  expect(parse).toHaveBeenCalledTimes(2);
+});
+
+it("redacts an unavailable SDK failure while retaining the final cause", async () => {
+  const finalError = new OpenAI.RateLimitError(
+    429,
+    {},
+    SENTINEL_RAW_OUTPUT,
+    new Headers(),
+  );
+  const parse = vi
+    .fn()
+    .mockRejectedValueOnce(new OpenAI.APIConnectionTimeoutError())
+    .mockRejectedValueOnce(finalError);
+
+  const error = await callStructured({
+    ...options,
+    instructions: SENTINEL_INSTRUCTIONS,
+    input: SENTINEL_INPUT,
+    parse,
+  }).catch((reason: unknown) => reason);
+
+  expect(error).toMatchObject({
+    code: "MODEL_UNAVAILABLE",
+    message: "MODEL_UNAVAILABLE",
+  } satisfies Partial<ModelUnavailableError>);
+  expect((error as ModelUnavailableError).cause).toBe(finalError);
+  expect((error as ModelUnavailableError).message).not.toContain(
+    SENTINEL_INSTRUCTIONS,
+  );
+  expect((error as ModelUnavailableError).message).not.toContain(SENTINEL_INPUT);
+  expect((error as ModelUnavailableError).message).not.toContain(
+    SENTINEL_RAW_OUTPUT,
+  );
   expect(parse).toHaveBeenCalledTimes(2);
 });
