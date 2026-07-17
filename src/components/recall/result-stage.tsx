@@ -19,7 +19,7 @@ const RESULT_DETAIL: Record<RepairResult["overallStatus"], string> = {
 
 const TRANSFER_COPY = {
   repaired: { heading: "Transfer confirmed", tone: "success" },
-  partial: { heading: "Transfer is taking shape", tone: "warning" },
+  partial: { heading: "Transfer is partly supported", tone: "warning" },
   not_repaired: { heading: "Transfer needs another pass", tone: "danger" },
 } as const;
 
@@ -27,7 +27,7 @@ const TRANSFER_DETAIL: Record<RepairResult["overallStatus"], string> = {
   repaired:
     "The revised explanation applies the supported idea accurately in the new situation.",
   partial:
-    "The new situation is handled more clearly, but one condition remains incomplete.",
+    "The transfer response applies part of the idea, but one condition remains incomplete.",
   not_repaired:
     "The new situation still needs an explanation supported by the study material.",
 };

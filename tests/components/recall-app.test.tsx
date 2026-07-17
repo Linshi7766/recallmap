@@ -152,13 +152,30 @@ function repairForStatus(
   return DEMO_REPAIR;
 }
 
+function invalidPartialRepair(kind: "unchanged" | "status-only"): RepairResult {
+  return {
+    ...DEMO_REPAIR,
+    nodes: DEMO_DIAGNOSIS.nodes.map((node, index) => ({
+      ...node,
+      previousStatus: node.status,
+      status:
+        kind === "status-only" && index === 1
+          ? ("incomplete" as const)
+          : node.status,
+      repairExplanation: "The response records the current reasoning link.",
+    })),
+    overallStatus: "partial",
+    recallCard: null,
+  };
+}
+
 function transferRepair(
   overallStatus: RepairResult["overallStatus"],
 ): RepairResult {
   return {
     nodes: ALL_CORRECT_DIAGNOSIS.nodes.map((node, index) => {
       const unresolved =
-        overallStatus !== "repaired" && index === 1
+        overallStatus === "partial" && index === 1
           ? {
               claim:
                 overallStatus === "partial"
@@ -173,7 +190,13 @@ function transferRepair(
                   ? "The new case is partly analyzed but still misses a required condition."
                   : "The new case repeats an unsupported causal inference.",
             }
-          : {};
+          : overallStatus === "not_repaired"
+            ? {
+                claim: `Transfer reasoning ${index + 1} remains unsupported.`,
+                status: "misconception" as const,
+                diagnosis: `The transfer response does not support reasoning link ${index + 1}.`,
+              }
+            : {};
 
       return {
         ...node,
@@ -776,7 +799,7 @@ it("uses a neutral transfer question instead of inventing an all-correct gap", a
 
 it.each([
   ["repaired", "Transfer confirmed", "success"],
-  ["partial", "Transfer is taking shape", "warning"],
+  ["partial", "Transfer is partly supported", "warning"],
   ["not_repaired", "Transfer needs another pass", "danger"],
 ] as const)(
   "uses transfer-specific %s result copy and recall-card rules",
@@ -812,6 +835,48 @@ it.each([
         screen.queryByRole("heading", { name: "Recall card" }),
       ).not.toBeInTheDocument();
     }
+  },
+);
+
+it.each([
+  ["unchanged", "unchanged partial"],
+  ["status-only", "status-only partial"],
+] as const)(
+  "rejects a %s repair response instead of rendering improvement copy",
+  async (kind) => {
+    localStorage.setItem(
+      "recall.session.v1",
+      JSON.stringify(
+        createRestoredSession({
+          stage: "repair",
+          diagnosis: DEMO_DIAGNOSIS,
+          probe: DEMO_PROBE,
+          revisedExplanation: DEMO_REVISED_EXPLANATION,
+        }),
+      ),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(repairResponse(invalidPartialRepair(kind))),
+    );
+    const user = userEvent.setup();
+
+    render(<RecallApp />);
+    await user.click(
+      await screen.findByRole("button", {
+        name: /check my repaired understanding/i,
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /could not validate the learning service response/i,
+    );
+    expect(screen.getByLabelText(/revised explanation/i)).toHaveValue(
+      DEMO_REVISED_EXPLANATION,
+    );
+    expect(
+      screen.queryByRole("heading", { name: /a key gap is smaller/i }),
+    ).not.toBeInTheDocument();
   },
 );
 

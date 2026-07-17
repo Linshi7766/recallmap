@@ -161,6 +161,55 @@ async function reachDiagnosis(
   await page.getByRole("button", { name: /reveal my blind spot/i }).click();
 }
 
+async function expectAccessibleProgress(
+  page: Page,
+  currentStep: "Choose" | "Teach Back" | "Challenge" | "Verify",
+) {
+  const progress = page.getByRole("navigation", { name: /lesson progress/i });
+  await expect(
+    progress.getByRole("listitem").filter({ hasText: currentStep }),
+  ).toHaveAttribute("aria-current", "step");
+
+  const inactiveColors = await progress
+    .locator("li:not([aria-current='step'])")
+    .evaluateAll((items) =>
+      items.map((item) => getComputedStyle(item).color),
+    );
+  expect(inactiveColors).toEqual(
+    inactiveColors.map(() => "rgb(100, 116, 139)"),
+  );
+
+  const contrastOnWhite = await progress
+    .locator("li:not([aria-current='step'])")
+    .first()
+    .evaluate((item) => {
+      const channels = getComputedStyle(item)
+        .color.match(/\d+/g)!
+        .slice(0, 3)
+        .map(Number);
+      const luminance = (rgb: number[]) => {
+        const linear = rgb.map((channel) => {
+          const value = channel / 255;
+          return value <= 0.04045
+            ? value / 12.92
+            : ((value + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * linear[0]! + 0.7152 * linear[1]! + 0.0722 * linear[2]!;
+      };
+      const foreground = luminance(channels);
+      const white = luminance([255, 255, 255]);
+      return (white + 0.05) / (foreground + 0.05);
+    });
+  expect(contrastOnWhite).toBeGreaterThanOrEqual(4.5);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+}
+
 test("student reveals and repairs a misconception", async ({ page }) => {
   await mockDemoApi(page);
   await reachDiagnosis(page);
@@ -274,3 +323,42 @@ test("an all-correct diagnosis produces a successful transfer result", async ({
       .getByText(TRANSFER_REPAIR.recallCard!, { exact: true }),
   ).toBeVisible();
 });
+
+for (const viewport of [
+  { label: "desktop", width: 1280, height: 900 },
+  { label: "390px", width: 390, height: 844 },
+]) {
+  test(`progress states keep accessible contrast and no overflow at ${viewport.label}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await mockDemoApi(page);
+    await page.goto("/");
+    await expect(
+      page.getByRole("button", { name: /start sample lesson/i }),
+    ).toBeEnabled();
+    await expectAccessibleProgress(page, "Choose");
+
+    await page.getByRole("button", { name: /start sample lesson/i }).click();
+    await expect(page.getByRole("heading", { name: DEMO_CHALLENGE.prompt })).toBeVisible();
+    await expectAccessibleProgress(page, "Teach Back");
+
+    await page.getByLabel(/your explanation/i).fill(DEMO_FIRST_EXPLANATION);
+    await page.getByRole("button", { name: /reveal my blind spot/i }).click();
+    await expect(page.getByLabel(/highest-priority learning gap/i)).toBeVisible();
+    await expectAccessibleProgress(page, "Challenge");
+
+    await page.getByRole("button", { name: /work through this challenge/i }).click();
+    await expect(page.getByLabel(/revised explanation/i)).toBeVisible();
+    await expectAccessibleProgress(page, "Challenge");
+    await page.getByLabel(/revised explanation/i).fill(DEMO_REVISED_EXPLANATION);
+    await page
+      .getByRole("button", { name: /check my repaired understanding/i })
+      .click();
+
+    await expect(
+      page.getByRole("heading", { name: /understanding repaired/i }),
+    ).toBeVisible();
+    await expectAccessibleProgress(page, "Verify");
+  });
+}

@@ -15,6 +15,7 @@ import {
   type ReasoningNode,
   type RepairResult,
 } from "@/lib/domain/contracts";
+import { assertRepairMatchesDiagnosis } from "@/lib/domain/repair";
 import { getDemoFallback } from "@/lib/fixtures/demo-fallback";
 
 type SessionInput = { source: LessonSource; sessionId: string };
@@ -102,8 +103,8 @@ async function dispatch(
       });
       return { diagnosis, probe };
     }
-    case "verify":
-      return operations.verifyRepair({
+    case "verify": {
+      const repair = await operations.verifyRepair({
         source: request.source,
         sessionId: request.sessionId,
         firstExplanation: request.firstExplanation,
@@ -111,6 +112,9 @@ async function dispatch(
         diagnosis: request.diagnosis,
         probe: request.probe,
       });
+      assertRepairMatchesDiagnosis(request.diagnosis, repair);
+      return repair;
+    }
   }
 }
 

@@ -10,6 +10,7 @@ import {
   type Probe,
   type RepairResult,
 } from "@/lib/domain/contracts";
+import { assertRepairMatchesDiagnosis } from "@/lib/domain/repair";
 
 const DiagnosisResultSchema = z
   .object({
@@ -136,7 +137,7 @@ export function requestDiagnosis(
   );
 }
 
-export function requestRepair(
+export async function requestRepair(
   sessionId: string,
   source: LessonSource,
   challenge: Challenge,
@@ -146,7 +147,7 @@ export function requestRepair(
   revisedExplanation: string,
 ): Promise<RepairResult> {
   void challenge;
-  return postLearning(
+  const repair = await postLearning(
     {
       operation: "verify",
       sessionId,
@@ -158,4 +159,12 @@ export function requestRepair(
     },
     RepairResultSchema,
   );
+
+  try {
+    assertRepairMatchesDiagnosis(diagnosis, repair);
+  } catch {
+    throw new LearningApiError("INVALID_RESPONSE");
+  }
+
+  return repair;
 }

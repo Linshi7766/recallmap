@@ -34,6 +34,7 @@ const REVISED =
   "Variables moving together show association, while causation requires evidence that rules out reverse causation, common causes, bias, and chance.";
 const ALL_CORRECT_EXPLANATION =
   "Correlation describes variables moving together, but causation needs added evidence that rules out reverse causation, common causes, selection bias, and chance.";
+const VALIDATION_SENTINEL = "raw-validation-sentinel";
 
 const CHALLENGE: Challenge = {
   lessonTitle: SOURCE.title,
@@ -256,6 +257,35 @@ describe("grounded learning operations", () => {
     await expect(
       generateChallenge({ source: SOURCE, sessionId: SESSION_ID }, call),
     ).rejects.toThrow(/evidence not found/i);
+  });
+
+  it("retries ungrounded evidence with fixed sanitized feedback", async () => {
+    const parse = vi
+      .fn()
+      .mockResolvedValueOnce({
+        output_parsed: {
+          ...CHALLENGE,
+          evidencePassages: [`Invented evidence ${VALIDATION_SENTINEL}`],
+        },
+      })
+      .mockResolvedValueOnce({ output_parsed: CHALLENGE });
+    const retryingCall = ((options: AnyOptions) =>
+      callStructured({ ...options, parse })) as StructuredCaller;
+
+    await expect(
+      generateChallenge(
+        { source: SOURCE, sessionId: SESSION_ID },
+        retryingCall,
+      ),
+    ).resolves.toEqual(CHALLENGE);
+
+    expect(parse).toHaveBeenCalledTimes(2);
+    const feedback = String(parse.mock.calls[1]?.[0].input).split(
+      "<validation_feedback>",
+    )[1];
+    expect(feedback).toContain("domain code=evidence_not_grounded");
+    expect(feedback).not.toContain(VALIDATION_SENTINEL);
+    expect(feedback.length).toBeLessThanOrEqual(500);
   });
 
   it("contains source closing-tag attacks while accepting decoded angle-bracket evidence", async () => {
@@ -537,6 +567,15 @@ describe("grounded learning operations", () => {
     expect(options.instructions).toMatch(
       /recall card.*exactly match.*supported current node claim/i,
     );
+    expect(options.instructions).toMatch(
+      /priority.*correct.*repaired.*misconception.*incomplete.*partial.*otherwise.*not_repaired/i,
+    );
+    expect(options.instructions).toMatch(
+      /transfer.*all nodes.*correct.*repaired.*some.*correct.*partial.*none.*correct.*not_repaired/i,
+    );
+    expect(options.instructions).toMatch(
+      /whenever.*status changes.*both.*claim and diagnosis.*change/i,
+    );
     for (const tag of [
       "original_explanation",
       "revised_explanation",
@@ -612,6 +651,41 @@ describe("grounded learning operations", () => {
     );
   });
 
+  it("rejects unchanged priority reasoning labeled partial", async () => {
+    const validate = await repairValidation();
+    const unchanged: RepairResult = {
+      ...REPAIR,
+      nodes: DIAGNOSIS.nodes.map((node) => ({
+        ...node,
+        previousStatus: node.status,
+        repairExplanation: "The response leaves this reasoning link unchanged.",
+      })),
+      overallStatus: "partial",
+      recallCard: null,
+    };
+
+    expect(() => validate(unchanged)).toThrow(/overall status.*priority/i);
+  });
+
+  it("rejects a status-only priority improvement labeled partial", async () => {
+    const validate = await repairValidation();
+    const relabeled: RepairResult = {
+      ...REPAIR,
+      nodes: DIAGNOSIS.nodes.map((node, index) => ({
+        ...node,
+        previousStatus: node.status,
+        status: index === 1 ? ("incomplete" as const) : node.status,
+        repairExplanation: "The response records the current reasoning link.",
+      })),
+      overallStatus: "partial",
+      recallCard: null,
+    };
+
+    expect(() => validate(relabeled)).toThrow(
+      /status change.*both claim and diagnosis/i,
+    );
+  });
+
   it("requires transfer outcomes to agree with their current node states", async () => {
     const transferDiagnosis: Diagnosis = {
       nodes: DIAGNOSIS.nodes.map((node) => ({
@@ -682,15 +756,17 @@ describe("grounded learning operations", () => {
           overallStatus === "repaired"
             ? supportedNodes
             : supportedNodes.map((node, index) =>
-                index === 1
-                  ? {
+                overallStatus === "partial" && index === 0
+                  ? node
+                  : {
                       ...node,
+                      claim: `Transfer reasoning ${index + 1} remains unsupported.`,
+                      diagnosis: `The transfer response does not support reasoning link ${index + 1}.`,
                       status:
                         overallStatus === "partial"
                           ? ("incomplete" as const)
                           : ("misconception" as const),
-                    }
-                  : node,
+                    },
               ),
         overallStatus,
         recallCard:
@@ -771,6 +847,12 @@ describe("grounded learning operations", () => {
       REPAIR,
     );
     expect(parse).toHaveBeenCalledTimes(2);
+    const feedback = String(parse.mock.calls[1]?.[0].input).split(
+      "<validation_feedback>",
+    )[1];
+    expect(feedback).toContain("domain code=repair_invariant_failed");
+    expect(feedback).not.toContain(DIAGNOSIS.nodes[1].claim);
+    expect(feedback.length).toBeLessThanOrEqual(500);
   });
 
   it("rejects repair evidence that is absent from the source", async () => {

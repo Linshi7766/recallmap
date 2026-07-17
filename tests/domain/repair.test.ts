@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Diagnosis, RepairResult } from "@/lib/domain/contracts";
 import { assertRepairMatchesDiagnosis } from "@/lib/domain/repair";
+import {
+  DEMO_DIAGNOSIS,
+  DEMO_REPAIR,
+} from "@/lib/fixtures/demo-fallback";
 
 const diagnosis: Diagnosis = {
   nodes: [
@@ -62,4 +66,100 @@ describe("repair semantic validation", () => {
       }),
     ).toThrow(/recall card.*supported current claim/i);
   });
+
+  it("rejects unchanged priority reasoning labeled partial", () => {
+    const unchanged: RepairResult = {
+      ...DEMO_REPAIR,
+      nodes: DEMO_DIAGNOSIS.nodes.map((node) => ({
+        ...node,
+        previousStatus: node.status,
+        repairExplanation: "The response leaves this reasoning link unchanged.",
+      })),
+      overallStatus: "partial",
+      recallCard: null,
+    };
+
+    expect(() =>
+      assertRepairMatchesDiagnosis(DEMO_DIAGNOSIS, unchanged),
+    ).toThrow(/overall status.*priority/i);
+  });
+
+  it("rejects a status-only partial improvement", () => {
+    const relabeled: RepairResult = {
+      ...DEMO_REPAIR,
+      nodes: DEMO_DIAGNOSIS.nodes.map((node, index) => ({
+        ...node,
+        previousStatus: node.status,
+        status: index === 1 ? ("incomplete" as const) : node.status,
+        repairExplanation: "The response records the current reasoning link.",
+      })),
+      overallStatus: "partial",
+      recallCard: null,
+    };
+
+    expect(() =>
+      assertRepairMatchesDiagnosis(DEMO_DIAGNOSIS, relabeled),
+    ).toThrow(/status change.*both claim and diagnosis/i);
+  });
+
+  it("accepts a priority misconception that genuinely improves to incomplete", () => {
+    const partial: RepairResult = {
+      ...DEMO_REPAIR,
+      nodes: DEMO_DIAGNOSIS.nodes.map((node, index) =>
+        index === 1
+          ? {
+              ...node,
+              previousStatus: node.status,
+              status: "incomplete" as const,
+              claim:
+                "Correlation alone is insufficient, but the required causal evidence is not yet stated.",
+              diagnosis:
+                "The causal leap is removed, while the evidentiary standard remains incomplete.",
+              repairExplanation:
+                "The response rejects the original misconception but remains incomplete.",
+            }
+          : {
+              ...node,
+              previousStatus: node.status,
+              repairExplanation: "The response preserves this reasoning link.",
+            },
+      ),
+      overallStatus: "partial",
+      recallCard: null,
+    };
+
+    expect(() =>
+      assertRepairMatchesDiagnosis(DEMO_DIAGNOSIS, partial),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["not_repaired", ["correct", "incomplete", "misconception"]],
+    ["partial", ["incomplete", "misconception", "incomplete"]],
+  ] as const)(
+    "rejects a transfer labeled %s when its node distribution says otherwise",
+    (overallStatus, statuses) => {
+      const mislabeled: RepairResult = {
+        ...repair,
+        nodes: repair.nodes.map((node, index) => ({
+          ...node,
+          status: statuses[index]!,
+          claim:
+            statuses[index] === "correct"
+              ? node.claim
+              : `Transfer reasoning ${index + 1} is not yet supported.`,
+          diagnosis:
+            statuses[index] === "correct"
+              ? node.diagnosis
+              : `The transfer response leaves reasoning link ${index + 1} unsupported.`,
+        })),
+        overallStatus,
+        recallCard: null,
+      };
+
+      expect(() =>
+        assertRepairMatchesDiagnosis(diagnosis, mislabeled),
+      ).toThrow(/transfer status.*current nodes/i);
+    },
+  );
 });

@@ -6,6 +6,7 @@ import {
   ModelUnavailableError,
   StructuredModelError,
 } from "@/lib/ai/errors";
+import { ModelOutputValidationError } from "@/lib/domain/output-validation";
 
 const Output = z.object({ value: z.string() });
 
@@ -58,6 +59,104 @@ it("retries exactly once after schema-invalid output", async () => {
   expect(parse).toHaveBeenCalledTimes(2);
 });
 
+it("adds bounded schema feedback only to the second request", async () => {
+  const parse = vi
+    .fn()
+    .mockResolvedValueOnce({
+      output_parsed: { value: { injected: SENTINEL_RAW_OUTPUT } },
+    })
+    .mockResolvedValueOnce({ output_parsed: { value: "ok" } });
+
+  await expect(
+    callStructured({
+      ...options,
+      input: SENTINEL_INPUT,
+      parse,
+    }),
+  ).resolves.toEqual({ value: "ok" });
+
+  const firstRequest = parse.mock.calls[0]?.[0];
+  const secondRequest = parse.mock.calls[1]?.[0];
+  expect(firstRequest?.input).toBe(SENTINEL_INPUT);
+  expect(firstRequest?.instructions).toBe(options.instructions);
+  expect(secondRequest?.instructions).toBe(options.instructions);
+  expect(secondRequest?.input).toBe(
+    `${SENTINEL_INPUT}\n\n<validation_feedback>\n` +
+      "The previous structured response failed validation.\n" +
+      "- schema path=value code=invalid_type\n" +
+      "Return a corrected structured response. Do not repeat or quote prior values.\n" +
+      "</validation_feedback>",
+  );
+  const feedback = String(secondRequest?.input).slice(SENTINEL_INPUT.length);
+  expect(feedback.length).toBeLessThanOrEqual(512);
+  expect(feedback).not.toContain(SENTINEL_RAW_OUTPUT);
+});
+
+it("bounds feedback even when several validation paths are deeply nested", async () => {
+  const DeepOutput = z.object({
+    repairExplanation: z.object({
+      repairExplanation: z.object({
+        repairExplanation: z.object({
+          repairExplanation: z.object({
+            repairExplanation: z.object({
+              value: z.string(),
+              evidencePassages: z.string(),
+              evaluationTarget: z.string(),
+            }),
+          }),
+        }),
+      }),
+    }),
+  });
+  const invalid = {
+    repairExplanation: {
+      repairExplanation: {
+        repairExplanation: {
+          repairExplanation: {
+            repairExplanation: {
+              value: 1,
+              evidencePassages: 2,
+              evaluationTarget: 3,
+            },
+          },
+        },
+      },
+    },
+  };
+  const valid = {
+    repairExplanation: {
+      repairExplanation: {
+        repairExplanation: {
+          repairExplanation: {
+            repairExplanation: {
+              value: "ok",
+              evidencePassages: "ok",
+              evaluationTarget: "ok",
+            },
+          },
+        },
+      },
+    },
+  };
+  const parse = vi
+    .fn()
+    .mockResolvedValueOnce({ output_parsed: invalid })
+    .mockResolvedValueOnce({ output_parsed: valid });
+
+  await callStructured({
+    ...options,
+    schema: DeepOutput,
+    schemaName: "deep_test",
+    parse,
+  });
+
+  const feedback = String(parse.mock.calls[1]?.[0].input).slice(
+    options.input.length,
+  );
+  expect(feedback.length).toBeLessThanOrEqual(512);
+  expect(feedback).toMatch(/<\/validation_feedback>$/);
+});
+
 it("retries once when output parsing returns null", async () => {
   const parse = vi
     .fn()
@@ -70,11 +169,14 @@ it("retries once when output parsing returns null", async () => {
   expect(parse).toHaveBeenCalledTimes(2);
 });
 
-it("retries once when validation rejects parsed output", async () => {
+it("retries once when trusted domain validation rejects parsed output", async () => {
   const validate = vi
     .fn<(output: z.infer<typeof Output>) => void>()
     .mockImplementationOnce(() => {
-      throw new Error("business validation failed");
+      throw new ModelOutputValidationError(
+        "repair_invariant_failed",
+        "business validation failed",
+      );
     });
   const parse = vi
     .fn()
@@ -85,6 +187,54 @@ it("retries once when validation rejects parsed output", async () => {
   });
   expect(parse).toHaveBeenCalledTimes(2);
   expect(validate).toHaveBeenCalledTimes(2);
+});
+
+it("uses fixed domain feedback without reflecting a validation error message", async () => {
+  const validate = vi
+    .fn<(output: z.infer<typeof Output>) => void>()
+    .mockImplementationOnce(() => {
+      throw new ModelOutputValidationError(
+        "evidence_not_grounded",
+        `business validation failed: ${SENTINEL_RAW_OUTPUT}`,
+      );
+    });
+  const parse = vi
+    .fn()
+    .mockResolvedValue({ output_parsed: { value: "ok" } });
+
+  await expect(
+    callStructured({ ...options, input: SENTINEL_INPUT, parse, validate }),
+  ).resolves.toEqual({ value: "ok" });
+
+  expect(parse).toHaveBeenCalledTimes(2);
+  const feedback = String(parse.mock.calls[1]?.[0].input).slice(
+    SENTINEL_INPUT.length,
+  );
+  expect(feedback).toBe(
+      "\n\n<validation_feedback>\n" +
+      "The previous structured response failed validation.\n" +
+      "- domain code=evidence_not_grounded\n" +
+      "Return a corrected structured response. Do not repeat or quote prior values.\n" +
+      "</validation_feedback>",
+  );
+  expect(feedback.length).toBeLessThanOrEqual(512);
+  expect(feedback).not.toContain(SENTINEL_RAW_OUTPUT);
+});
+
+it("does not retry or reclassify an unexpected validator error", async () => {
+  const error = new Error(`unexpected validator bug: ${SENTINEL_RAW_OUTPUT}`);
+  const validate = vi.fn(() => {
+    throw error;
+  });
+  const parse = vi
+    .fn()
+    .mockResolvedValue({ output_parsed: { value: "ok" } });
+
+  await expect(
+    callStructured({ ...options, parse, validate }),
+  ).rejects.toBe(error);
+  expect(parse).toHaveBeenCalledTimes(1);
+  expect(validate).toHaveBeenCalledTimes(1);
 });
 
 it("preserves a model refusal without retrying it", async () => {
@@ -107,6 +257,7 @@ it("preserves a model refusal without retrying it", async () => {
 it.each([
   ["rate limits", new OpenAI.RateLimitError(429, {}, "rate limited", new Headers())],
   ["timeouts", new OpenAI.APIConnectionTimeoutError()],
+  ["HTTP timeouts", new OpenAI.APIError(408, {}, "request timeout", new Headers())],
   ["server errors", new OpenAI.InternalServerError(500, {}, "server", new Headers())],
 ])("maps SDK %s to MODEL_UNAVAILABLE", async (_name, error) => {
   const parse = vi.fn().mockRejectedValue(error);
@@ -115,6 +266,23 @@ it.each([
     ModelUnavailableError,
   );
   expect(parse).toHaveBeenCalledTimes(2);
+});
+
+it.each([
+  [
+    "authentication failures",
+    new OpenAI.AuthenticationError(401, {}, "invalid key", new Headers()),
+  ],
+  [
+    "bad requests",
+    new OpenAI.BadRequestError(400, {}, "invalid request", new Headers()),
+  ],
+  ["unexpected parse failures", new Error("unexpected parser bug")],
+])("does not retry or reclassify %s", async (_name, error) => {
+  const parse = vi.fn().mockRejectedValue(error);
+
+  await expect(callStructured({ ...options, parse })).rejects.toBe(error);
+  expect(parse).toHaveBeenCalledTimes(1);
 });
 
 it("returns MODEL_OUTPUT_INVALID after two invalid outputs", async () => {
@@ -129,7 +297,10 @@ it("returns MODEL_OUTPUT_INVALID after two invalid outputs", async () => {
 it("returns MODEL_OUTPUT_INVALID after validation fails twice", async () => {
   const parse = vi.fn().mockResolvedValue({ output_parsed: { value: "ok" } });
   const validate = () => {
-    throw new Error("business validation failed");
+    throw new ModelOutputValidationError(
+      "repair_invariant_failed",
+      "business validation failed",
+    );
   };
 
   await expect(callStructured({ ...options, parse, validate })).rejects.toMatchObject({

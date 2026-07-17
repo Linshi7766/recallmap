@@ -1,3 +1,4 @@
+import OpenAI from "openai";
 import { describe, expect, it, vi } from "vitest";
 import {
   type Diagnosis,
@@ -165,6 +166,56 @@ describe("POST /api/learn", () => {
     expect(await body(response)).toEqual({ ok: true, data: DEMO_REPAIR, fallback: false });
   });
 
+  it.each([
+    [
+      "unchanged partial",
+      {
+        ...DEMO_REPAIR,
+        nodes: DEMO_DIAGNOSIS.nodes.map((node) => ({
+          ...node,
+          previousStatus: node.status,
+          repairExplanation: "The response leaves this reasoning link unchanged.",
+        })),
+        overallStatus: "partial" as const,
+        recallCard: null,
+      },
+    ],
+    [
+      "status-only partial",
+      {
+        ...DEMO_REPAIR,
+        nodes: DEMO_DIAGNOSIS.nodes.map((node, index) => ({
+          ...node,
+          previousStatus: node.status,
+          status: index === 1 ? ("incomplete" as const) : node.status,
+          repairExplanation: "The response records the current reasoning link.",
+        })),
+        overallStatus: "partial" as const,
+        recallCard: null,
+      },
+    ],
+  ])("rejects %s model output before returning route success", async (_name, invalidRepair) => {
+    const verifyRepair = vi.fn(async () => invalidRepair);
+    const post = createLearnPost(operations({ verifyRepair }));
+
+    const response = await post(
+      request({
+        ...verifyRequest(),
+        revisedExplanation: `${DEMO_REVISED_EXPLANATION} The wording differs from the exact demo fixture.`,
+      }),
+    );
+
+    expect(verifyRepair).toHaveBeenCalledOnce();
+    expect(response.status).toBe(500);
+    expect(await body(response)).toEqual({
+      ok: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "The learning service encountered an unexpected error.",
+      },
+    });
+  });
+
   it("uses fallback only after a live failure for the exact demo request", async () => {
     const unavailable = vi.fn(async () => {
       throw new ModelUnavailableError();
@@ -320,5 +371,34 @@ describe("POST /api/learn", () => {
       expect(JSON.stringify(value)).not.toContain(secret);
       expect(JSON.stringify(value)).not.toContain(SAMPLE_LESSON.text);
     }
+  });
+
+  it.each([
+    [
+      "authentication failure",
+      new OpenAI.AuthenticationError(401, {}, "invalid key", new Headers()),
+    ],
+    [
+      "bad request",
+      new OpenAI.BadRequestError(400, {}, "invalid request", new Headers()),
+    ],
+    ["unexpected parse failure", new Error("unexpected parser bug")],
+  ])("does not activate exact demo fallback for an SDK %s", async (_name, error) => {
+    const live = vi.fn(async () => {
+      throw error;
+    });
+    const post = createLearnPost(operations({ generateChallenge: live }));
+
+    const response = await post(request(challengeRequest()));
+
+    expect(live).toHaveBeenCalledOnce();
+    expect(response.status).toBe(500);
+    expect(await body(response)).toEqual({
+      ok: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "The learning service encountered an unexpected error.",
+      },
+    });
   });
 });

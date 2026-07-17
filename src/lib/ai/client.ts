@@ -3,11 +3,12 @@ import "server-only";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import type { ResponseParseParams } from "openai/resources/responses/responses";
-import type { z } from "zod";
+import { z } from "zod";
 import {
   ModelUnavailableError,
   StructuredModelError,
 } from "@/lib/ai/errors";
+import { ModelOutputValidationError } from "@/lib/domain/output-validation";
 
 const MODEL = "gpt-5.6";
 
@@ -79,19 +80,77 @@ function isUnavailableSdkError(error: unknown): boolean {
     return true;
   }
 
-  return error instanceof OpenAI.APIError && error.status !== undefined && error.status >= 500;
+  return (
+    error instanceof OpenAI.APIError &&
+    (error.status === 408 ||
+      (error.status !== undefined && error.status >= 500))
+  );
 }
 
-function classifyModelError(error: unknown): StructuredModelError {
-  if (error instanceof StructuredModelError) {
-    return error;
+const SAFE_SCHEMA_PATH_SEGMENTS = new Set([
+  "value",
+  "lessonTitle",
+  "concept",
+  "prompt",
+  "evidencePassages",
+  "nodes",
+  "priorityNodeId",
+  "question",
+  "evaluationTarget",
+  "id",
+  "claim",
+  "status",
+  "diagnosis",
+  "evidence",
+  "confidence",
+  "previousStatus",
+  "repairExplanation",
+  "overallStatus",
+  "before",
+  "after",
+  "recallCard",
+]);
+
+function safeIssuePath(path: PropertyKey[]): string {
+  if (path.length === 0) {
+    return "root";
   }
 
-  if (isUnavailableSdkError(error)) {
-    return new ModelUnavailableError(error);
-  }
+  return path
+    .slice(0, 5)
+    .map((segment) => {
+      if (typeof segment === "number") {
+        return `[${segment}]`;
+      }
+      return typeof segment === "string" &&
+        SAFE_SCHEMA_PATH_SEGMENTS.has(segment)
+        ? segment
+        : "field";
+    })
+    .join(".");
+}
 
-  return new StructuredModelError("MODEL_OUTPUT_INVALID", error);
+function formatValidationFeedback(
+  error: z.ZodError | ModelOutputValidationError,
+): string {
+  const detail =
+    error instanceof z.ZodError
+      ? error.issues
+          .slice(0, 2)
+          .map(
+            (issue) =>
+              `- schema path=${safeIssuePath(issue.path)} code=${issue.code}`,
+          )
+          .join("\n")
+      : `- domain code=${error.feedbackCode}`;
+
+  return [
+    "<validation_feedback>",
+    "The previous structured response failed validation.",
+    detail,
+    "Return a corrected structured response. Do not repeat or quote prior values.",
+    "</validation_feedback>",
+  ].join("\n");
 }
 
 export async function callStructured<T>({
@@ -104,39 +163,59 @@ export async function callStructured<T>({
   validate,
 }: StructuredCallOptions<T>): Promise<T> {
   let lastError: unknown;
-  const request: ResponseParseParams = {
-    model: MODEL,
-    reasoning: { effort: "medium" },
-    store: false,
-    safety_identifier: safetyIdentifier,
-    instructions,
-    input,
-    text: {
-      format: zodTextFormat(schema, schemaName),
-      verbosity: "low",
-    },
-  };
+  let validationFeedback: string | undefined;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const response = await parse(request);
-      if (hasModelRefusal(response)) {
-        throw new StructuredModelError("MODEL_REFUSED");
-      }
+    const request: ResponseParseParams = {
+      model: MODEL,
+      reasoning: { effort: "medium" },
+      store: false,
+      safety_identifier: safetyIdentifier,
+      instructions,
+      input:
+        validationFeedback === undefined
+          ? input
+          : `${input}\n\n${validationFeedback}`,
+      text: {
+        format: zodTextFormat(schema, schemaName),
+        verbosity: "low",
+      },
+    };
 
+    let response: StructuredResponse;
+    try {
+      response = await parse(request);
+    } catch (error) {
+      if (!isUnavailableSdkError(error)) {
+        throw error;
+      }
+      lastError = error;
+      continue;
+    }
+
+    if (hasModelRefusal(response)) {
+      throw new StructuredModelError("MODEL_REFUSED");
+    }
+
+    try {
       const parsed = schema.parse(response.output_parsed);
       validate?.(parsed);
       return parsed;
     } catch (error) {
       if (
-        error instanceof StructuredModelError &&
-        error.code === "MODEL_REFUSED"
+        !(error instanceof z.ZodError) &&
+        !(error instanceof ModelOutputValidationError)
       ) {
         throw error;
       }
       lastError = error;
+      validationFeedback = formatValidationFeedback(error);
     }
   }
 
-  throw classifyModelError(lastError);
+  if (isUnavailableSdkError(lastError)) {
+    throw new ModelUnavailableError(lastError);
+  }
+
+  throw new StructuredModelError("MODEL_OUTPUT_INVALID", lastError);
 }
