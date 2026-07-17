@@ -4,6 +4,7 @@ import {
   diagnosisInstructions,
   probeInstructions,
   repairInstructions,
+  serializeModelPayload,
   wrapStudyMaterial,
 } from "@/lib/ai/prompts";
 import {
@@ -35,7 +36,7 @@ export async function generateChallenge(
     schema: ChallengeSchema,
     schemaName: "recall_challenge",
     instructions: challengeInstructions,
-    input: wrapStudyMaterial(input.source.text),
+    input: wrapStudyMaterial(serializeModelPayload(input.source.text)),
     safetyIdentifier: input.sessionId,
     validate: (value) =>
       assertEvidenceGrounded(input.source.text, value.evidencePassages),
@@ -54,9 +55,9 @@ export async function diagnoseExplanation(
     schemaName: "recall_diagnosis",
     instructions: diagnosisInstructions,
     input: [
-      wrapStudyMaterial(input.source.text),
-      `<challenge>\n${JSON.stringify(input.challenge)}\n</challenge>`,
-      `<student_explanation>\n${input.firstExplanation}\n</student_explanation>`,
+      wrapStudyMaterial(serializeModelPayload(input.source.text)),
+      `<challenge>\n${serializeModelPayload(input.challenge)}\n</challenge>`,
+      `<student_explanation>\n${serializeModelPayload(input.firstExplanation)}\n</student_explanation>`,
     ].join("\n"),
     safetyIdentifier: input.sessionId,
     validate: (value) =>
@@ -79,9 +80,9 @@ export async function generateChallengeProbe(
     schemaName: "recall_probe",
     instructions: probeInstructions(input.priorityNode),
     input: [
-      wrapStudyMaterial(input.source.text),
-      `<student_explanation>\n${input.firstExplanation}\n</student_explanation>`,
-      `<priority_node>\n${JSON.stringify(input.priorityNode)}\n</priority_node>`,
+      wrapStudyMaterial(serializeModelPayload(input.source.text)),
+      `<student_explanation>\n${serializeModelPayload(input.firstExplanation)}\n</student_explanation>`,
+      `<priority_node>\n${serializeModelPayload(input.priorityNode)}\n</priority_node>`,
     ].join("\n"),
     safetyIdentifier: input.sessionId,
   });
@@ -101,11 +102,11 @@ export async function verifyRepair(
     schemaName: "recall_repair",
     instructions: repairInstructions,
     input: [
-      wrapStudyMaterial(input.source.text),
-      `<original_student_explanation>\n${input.firstExplanation}\n</original_student_explanation>`,
-      `<revised_student_explanation>\n${input.revisedExplanation}\n</revised_student_explanation>`,
-      `<diagnosis>\n${JSON.stringify(input.diagnosis)}\n</diagnosis>`,
-      `<probe>\n${JSON.stringify(input.probe)}\n</probe>`,
+      wrapStudyMaterial(serializeModelPayload(input.source.text)),
+      `<original_explanation>\n${serializeModelPayload(input.firstExplanation)}\n</original_explanation>`,
+      `<revised_explanation>\n${serializeModelPayload(input.revisedExplanation)}\n</revised_explanation>`,
+      `<diagnosis>\n${serializeModelPayload(input.diagnosis)}\n</diagnosis>`,
+      `<probe>\n${serializeModelPayload(input.probe)}\n</probe>`,
     ].join("\n"),
     safetyIdentifier: input.sessionId,
     validate: (value) =>
