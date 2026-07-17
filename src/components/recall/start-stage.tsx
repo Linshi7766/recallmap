@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { LessonSourceSchema, type LessonSource } from "@/lib/domain/contracts";
 import { normalizeSourceText } from "@/lib/domain/evidence";
 import { SAMPLE_LESSON } from "@/lib/domain/sample-lesson";
+import { StageHeading } from "./stage-heading";
 
 type StartStageProps = {
   ready: boolean;
@@ -142,7 +143,9 @@ export function StartStage({
     <section className="stage start-stage" aria-labelledby="start-heading">
       <div className="hero-copy">
         <p className="eyebrow">MISCONCEPTION DETECTOR</p>
-        <h1 id="start-heading">Can you explain what you think you know?</h1>
+        <StageHeading id="start-heading">
+          Can you explain what you think you know?
+        </StageHeading>
         <p className="lede">Teach it back. Recall finds the hidden gap.</p>
       </div>
 

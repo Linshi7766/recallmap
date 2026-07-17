@@ -5,6 +5,7 @@ import {
   GenerateChallengeRequestSchema,
   LessonSourceSchema,
   LearningRequestSchema,
+  RepairResultSchema,
   VerifyRequestSchema,
 } from "@/lib/domain/contracts";
 
@@ -65,6 +66,23 @@ function probe() {
   return {
     question: "What other factor could explain this association?",
     evaluationTarget: "Distinguishes correlation from causation.",
+  };
+}
+
+function repairResult(
+  overallStatus: "repaired" | "partial" | "not_repaired",
+  recallCard: string | null,
+) {
+  return {
+    nodes: mixedDiagnosis().nodes.map((node) => ({
+      ...node,
+      previousStatus: node.status,
+      repairExplanation: "The revision explains how this reasoning link changed.",
+    })),
+    overallStatus,
+    before: "The original explanation made a causal claim from association alone.",
+    after: "The revised explanation now considers alternative causal structures.",
+    recallCard,
   };
 }
 
@@ -134,6 +152,43 @@ describe("domain contracts", () => {
     expect(() =>
       DiagnosisSchema.parse({ nodes, priorityNodeId: "node-1" }),
     ).toThrow();
+  });
+
+  it("requires a recall card only for repaired outcomes", () => {
+    expect(
+      RepairResultSchema.safeParse(
+        repairResult(
+          "repaired",
+          "Correlation alone cannot establish causation without added evidence.",
+        ),
+      ).success,
+    ).toBe(true);
+    expect(
+      RepairResultSchema.safeParse(repairResult("partial", null)).success,
+    ).toBe(true);
+    expect(
+      RepairResultSchema.safeParse(repairResult("not_repaired", null)).success,
+    ).toBe(true);
+
+    expect(
+      RepairResultSchema.safeParse(repairResult("repaired", null)).success,
+    ).toBe(false);
+    expect(
+      RepairResultSchema.safeParse(
+        repairResult(
+          "partial",
+          "Do not endorse this while the learning gap remains unresolved.",
+        ),
+      ).success,
+    ).toBe(false);
+    expect(
+      RepairResultSchema.safeParse(
+        repairResult(
+          "not_repaired",
+          "Do not endorse this while the learning gap remains unresolved.",
+        ),
+      ).success,
+    ).toBe(false);
   });
 
   it.each([

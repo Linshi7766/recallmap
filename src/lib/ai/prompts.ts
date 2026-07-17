@@ -58,6 +58,8 @@ export const repairInstructions = [
   "Your goal is to compare the original and revised explanations against the study material, diagnosis, and probe, then report grounded node updates.",
   "Every updated node's claim and diagnosis must describe the revised reasoning and agree with its current status.",
   "Never retain a misconception claim and merely relabel it correct; rewrite both the claim and diagnosis to reflect the repaired reasoning.",
+  "recallCard must be null for partial and not_repaired outcomes.",
+  "For a repaired outcome, the recall card must agree with supported current nodes: it must exactly match one supported current node claim and must not repeat an original non-correct claim.",
   sourceSafety,
   payloadSafety([
     "original_explanation",

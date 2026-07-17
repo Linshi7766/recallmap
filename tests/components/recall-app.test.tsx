@@ -114,14 +114,16 @@ function repairForStatus(
     return {
       ...DEMO_REPAIR,
       overallStatus,
+      recallCard: null,
       nodes: DEMO_REPAIR.nodes.map((node, index) =>
-        index === 2
+        index === 1
           ? {
               ...node,
-              claim: "A common cause is one possible alternative explanation.",
+              claim:
+                "Correlation alone is not enough, but the causal standard is still incomplete.",
               status: "incomplete" as const,
               diagnosis:
-                "The revision adds a common cause but still omits other plausible alternatives.",
+                "The revision rejects the original causal leap but does not yet state what added evidence is needed.",
             }
           : node,
       ),
@@ -132,6 +134,7 @@ function repairForStatus(
     return {
       ...DEMO_REPAIR,
       overallStatus,
+      recallCard: null,
       nodes: DEMO_REPAIR.nodes.map((node, index) =>
         index === 1
           ? {
@@ -146,6 +149,47 @@ function repairForStatus(
   }
 
   return DEMO_REPAIR;
+}
+
+function transferRepair(
+  overallStatus: RepairResult["overallStatus"],
+): RepairResult {
+  return {
+    nodes: ALL_CORRECT_DIAGNOSIS.nodes.map((node, index) => {
+      const unresolved =
+        overallStatus !== "repaired" && index === 1
+          ? {
+              claim:
+                overallStatus === "partial"
+                  ? "The transfer response identifies alternatives but does not apply the evidence standard."
+                  : "The transfer response treats the new association as a causal conclusion.",
+              status:
+                overallStatus === "partial"
+                  ? ("incomplete" as const)
+                  : ("misconception" as const),
+              diagnosis:
+                overallStatus === "partial"
+                  ? "The new case is partly analyzed but still misses a required condition."
+                  : "The new case repeats an unsupported causal inference.",
+            }
+          : {};
+
+      return {
+        ...node,
+        ...unresolved,
+        previousStatus: node.status,
+        repairExplanation:
+          "The transfer response records how this reasoning link changed.",
+      };
+    }),
+    overallStatus,
+    before: "The first explanation applied the idea to the source example.",
+    after: "The revised explanation applies the idea to a new situation.",
+    recallCard:
+      overallStatus === "repaired"
+        ? ALL_CORRECT_DIAGNOSIS.nodes[2].claim
+        : null,
+  };
 }
 
 function deferred<T>() {
@@ -184,11 +228,11 @@ it("introduces Recall as a guided misconception detector", async () => {
   vi.stubGlobal("fetch", vi.fn());
   render(<Page />);
 
-  expect(
-    screen.getByRole("heading", {
-      name: /can you explain what you think you know/i,
-    }),
-  ).toBeInTheDocument();
+  const heading = screen.getByRole("heading", {
+    name: /can you explain what you think you know/i,
+  });
+  expect(heading).toBeInTheDocument();
+  await waitFor(() => expect(heading).toHaveFocus());
   const start = screen.getByRole("button", { name: /start sample lesson/i });
   await waitFor(() => expect(start).toBeEnabled());
   expect(screen.getByText(/progress saved in this browser/i)).toBeVisible();
@@ -455,6 +499,11 @@ it("reveals the priority misconception, challenge, and non-color map semantics",
   expect(screen.getByText(DEMO_PROBE.question)).toBeVisible();
 
   const map = screen.getByRole("list", { name: /reasoning map/i });
+  const mapHeading = screen.getByRole("heading", {
+    level: 2,
+    name: "Reasoning map",
+  });
+  expect(map).toHaveAttribute("aria-labelledby", mapHeading.id);
   const nodes = within(map).getAllByRole("listitem");
   expect(nodes).toHaveLength(3);
   expect(nodes[0]).not.toHaveAttribute("aria-label");
@@ -537,8 +586,36 @@ it("shows a repair counter and an inline minimum-length error", async () => {
   await user.type(revised, "Still too short");
 
   expect(screen.getByText("15 / 4,000")).toBeVisible();
-  expect(screen.getByText(/65 more characters needed/i)).toBeVisible();
+  const counter = screen.getByText("15 / 4,000");
+  expect(counter).not.toHaveAttribute("aria-live");
+  const guidance = screen.getByText(/at least 80 characters required/i);
+  expect(guidance).toBeVisible();
+  expect(guidance).toHaveAttribute("role", "status");
   expect(revised).toHaveAttribute("aria-invalid", "true");
+  expect(
+    screen.getByRole("button", { name: /check my repaired understanding/i }),
+  ).toBeDisabled();
+});
+
+it("marks a restored explanation over 4,000 characters invalid", async () => {
+  localStorage.setItem(
+    "recall.session.v1",
+    JSON.stringify(
+      createRestoredSession({
+        stage: "repair",
+        diagnosis: DEMO_DIAGNOSIS,
+        probe: DEMO_PROBE,
+        revisedExplanation: "x".repeat(4_001),
+      }),
+    ),
+  );
+  vi.stubGlobal("fetch", vi.fn());
+
+  render(<RecallApp />);
+
+  const revised = await screen.findByLabelText(/revised explanation/i);
+  expect(revised).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByText(/1 character over the 4,000 limit/i)).toBeVisible();
   expect(
     screen.getByRole("button", { name: /check my repaired understanding/i }),
   ).toBeDisabled();
@@ -561,10 +638,12 @@ it("completes the mocked diagnosis, repair, and result flow", async () => {
     target: { value: DEMO_FIRST_EXPLANATION },
   });
   await user.click(screen.getByRole("button", { name: /reveal my blind spot/i }));
+  const diagnosisHeading = await screen.findByRole("heading", {
+    name: "One link needs attention",
+  });
+  await waitFor(() => expect(diagnosisHeading).toHaveFocus());
   await user.click(
-    await screen.findByRole("button", {
-      name: /work through this challenge/i,
-    }),
+    screen.getByRole("button", { name: /work through this challenge/i }),
   );
   fireEvent.change(screen.getByLabelText(/revised explanation/i), {
     target: { value: DEMO_REVISED_EXPLANATION },
@@ -573,13 +652,33 @@ it("completes the mocked diagnosis, repair, and result flow", async () => {
     screen.getByRole("button", { name: /check my repaired understanding/i }),
   );
 
-  expect(
-    await screen.findByRole("heading", { name: "Understanding repaired" }),
-  ).toBeVisible();
+  const resultHeading = await screen.findByRole("heading", {
+    name: "Understanding repaired",
+  });
+  expect(resultHeading).toBeVisible();
+  await waitFor(() => expect(resultHeading).toHaveFocus());
   expect(screen.getByText("Before → After")).toBeVisible();
   expect(screen.getByText(DEMO_REPAIR.before)).toBeVisible();
   expect(screen.getByText(DEMO_REPAIR.after)).toBeVisible();
-  expect(screen.getByText(DEMO_REPAIR.recallCard)).toBeVisible();
+  const recallCardContent = screen
+    .getByRole("heading", { name: "Recall card" })
+    .closest("aside")!;
+  expect(within(recallCardContent).getByText(DEMO_REPAIR.recallCard)).toBeVisible();
+  const result = screen.getByRole("heading", {
+    name: "Understanding repaired",
+  }).closest("section")!;
+  const resultChildren = Array.from(result.children);
+  const summary = result.querySelector(".stage-intro")!;
+  const comparison = result.querySelector(".before-after")!;
+  const recallCard = result.querySelector(".recall-card")!;
+  const resultMap = result.querySelector(".result-map")!;
+  expect(summary.nextElementSibling).toBe(comparison);
+  expect(resultChildren.indexOf(comparison)).toBeLessThan(
+    resultChildren.indexOf(recallCard),
+  );
+  expect(resultChildren.indexOf(recallCard)).toBeLessThan(
+    resultChildren.indexOf(resultMap),
+  );
   const repairedChange = screen
     .getByText("Previous: Misconception")
     .closest("[aria-label='Status change']");
@@ -622,7 +721,8 @@ it("uses a neutral transfer question instead of inventing an all-correct gap", a
     .mockResolvedValueOnce(challengeResponse())
     .mockResolvedValueOnce(
       diagnosisResponse(ALL_CORRECT_DIAGNOSIS, TRANSFER_PROBE),
-    );
+    )
+    .mockResolvedValueOnce(repairResponse(transferRepair("repaired")));
   vi.stubGlobal("fetch", fetchMock);
   const user = userEvent.setup();
 
@@ -652,8 +752,59 @@ it("uses a neutral transfer question instead of inventing an all-correct gap", a
     screen.getByRole("button", { name: /work through this challenge/i }),
   );
   expect(screen.getByText("Transfer question")).toBeVisible();
-  expect(screen.getByLabelText(/revised explanation/i)).toBeVisible();
+  fireEvent.change(screen.getByLabelText(/revised explanation/i), {
+    target: { value: DEMO_REVISED_EXPLANATION },
+  });
+  await user.click(
+    screen.getByRole("button", { name: /check my repaired understanding/i }),
+  );
+  expect(
+    await screen.findByRole("heading", { name: "Transfer confirmed" }),
+  ).toBeVisible();
+  expect(screen.getByText("KEEP THIS")).toBeVisible();
+  expect(screen.queryByText(/priority gap/i)).not.toBeInTheDocument();
 });
+
+it.each([
+  ["repaired", "Transfer confirmed", "success"],
+  ["partial", "Transfer is taking shape", "warning"],
+  ["not_repaired", "Transfer needs another pass", "danger"],
+] as const)(
+  "uses transfer-specific %s result copy and recall-card rules",
+  async (overallStatus, heading, tone) => {
+    localStorage.setItem(
+      "recall.session.v1",
+      JSON.stringify(
+        createRestoredSession({
+          stage: "result",
+          diagnosis: ALL_CORRECT_DIAGNOSIS,
+          probe: TRANSFER_PROBE,
+          revisedExplanation: DEMO_REVISED_EXPLANATION,
+          repair: transferRepair(overallStatus),
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", vi.fn());
+
+    render(<RecallApp />);
+
+    const resultHeading = await screen.findByRole("heading", { name: heading });
+    const result = resultHeading.closest("section");
+    expect(result).toHaveAttribute("data-tone", tone);
+    expect(result?.querySelector(".stage-intro")).not.toHaveTextContent(
+      /gap|repaired/i,
+    );
+    if (overallStatus === "repaired") {
+      expect(screen.getByText("KEEP THIS")).toBeVisible();
+      expect(screen.getByRole("heading", { name: "Recall card" })).toBeVisible();
+    } else {
+      expect(screen.queryByText("KEEP THIS")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Recall card" }),
+      ).not.toBeInTheDocument();
+    }
+  },
+);
 
 it("preserves the exact revised explanation when verification fails and retries it", async () => {
   const pendingRetry = deferred<Response>();
@@ -749,8 +900,64 @@ it.each([
     expect(
       await screen.findByRole("heading", { name: heading }),
     ).toBeVisible();
+    expect(screen.queryByText("KEEP THIS")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Recall card" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/congratulations|great job|celebrate/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Understanding repaired")).not.toBeInTheDocument();
+  },
+);
+
+it.each([
+  [
+    "teachback",
+    CHALLENGE.prompt,
+    ["Reveal my blind spot", "Back"],
+    {},
+  ],
+  [
+    "diagnosis",
+    "One link needs attention",
+    ["Work through this challenge", "Back to my explanation"],
+    { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE },
+  ],
+  [
+    "repair",
+    "Revise the explanation in your own words",
+    ["Check my repaired understanding", "Back to reasoning map"],
+    { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE },
+  ],
+  [
+    "result",
+    "Understanding repaired",
+    ["Try another concept", "Review my reasoning"],
+    {
+      diagnosis: DEMO_DIAGNOSIS,
+      probe: DEMO_PROBE,
+      revisedExplanation: DEMO_REVISED_EXPLANATION,
+      repair: DEMO_REPAIR,
+    },
+  ],
+] as const)(
+  "focuses the %s heading and keeps primary action first",
+  async (stage, heading, actions, overrides) => {
+    localStorage.setItem(
+      "recall.session.v1",
+      JSON.stringify(createRestoredSession({ stage, ...overrides })),
+    );
+    vi.stubGlobal("fetch", vi.fn());
+
+    render(<RecallApp />);
+
+    const stageHeading = await screen.findByRole("heading", { name: heading });
+    await waitFor(() => expect(stageHeading).toHaveFocus());
+    const stageSection = stageHeading.closest("section")!;
+    expect(
+      Array.from(stageSection.querySelectorAll(".stage-actions button")).map(
+        (button) => button.textContent?.trim(),
+      ),
+    ).toEqual(actions);
   },
 );
 

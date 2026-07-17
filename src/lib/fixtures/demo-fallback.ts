@@ -147,8 +147,7 @@ export const DEMO_REPAIR = deepFreeze(
     overallStatus: "repaired",
     before: DEMO_FIRST_EXPLANATION,
     after: DEMO_REVISED_EXPLANATION,
-    recallCard:
-      "Correlation describes co-variation; causation needs evidence that rules out plausible alternatives.",
+    recallCard: "Correlation alone cannot establish causation.",
   }),
 );
 

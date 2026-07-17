@@ -1,4 +1,5 @@
 import type { Challenge } from "@/lib/domain/contracts";
+import { StageHeading } from "./stage-heading";
 
 type TeachbackStageProps = {
   challenge: Challenge;
@@ -26,7 +27,7 @@ export function TeachbackStage({
     <section className="stage teachback-stage" aria-labelledby="prompt-heading">
       <p className="eyebrow">TEACH IT BACK</p>
       <p className="concept">{challenge.concept}</p>
-      <h1 id="prompt-heading">{challenge.prompt}</h1>
+      <StageHeading id="prompt-heading">{challenge.prompt}</StageHeading>
       <p className="stage-intro">
         Explain it in your own words. Recall will look at the reasoning, not
         polish or vocabulary.
@@ -65,18 +66,18 @@ export function TeachbackStage({
       <div className="stage-actions">
         <button
           type="button"
+          disabled={!isValid || busy}
+          onClick={onAnalyze}
+        >
+          {busy ? "Finding the key gap…" : "Reveal my blind spot"}
+        </button>
+        <button
+          type="button"
           className="secondary-button"
           disabled={busy}
           onClick={onBack}
         >
           Back
-        </button>
-        <button
-          type="button"
-          disabled={!isValid || busy}
-          onClick={onAnalyze}
-        >
-          {busy ? "Finding the key gap…" : "Reveal my blind spot"}
         </button>
       </div>
     </section>

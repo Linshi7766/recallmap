@@ -1,4 +1,5 @@
 import type { Diagnosis, Probe } from "@/lib/domain/contracts";
+import { StageHeading } from "./stage-heading";
 
 type RepairStageProps = {
   diagnosis: Diagnosis;
@@ -25,7 +26,7 @@ export function RepairStage({
 }: RepairStageProps) {
   const count = revisedExplanation.length;
   const isValid = count >= 80 && count <= 4_000;
-  const showLengthError = count > 0 && count < 80;
+  const showLengthError = count > 0 && !isValid;
   const isTransfer = diagnosis.priorityNodeId === null;
 
   return (
@@ -35,7 +36,9 @@ export function RepairStage({
       aria-busy={busy}
     >
       <p className="eyebrow">REBUILD THE LINK</p>
-      <h1 id="repair-heading">Revise the explanation in your own words</h1>
+      <StageHeading id="repair-heading">
+        Revise the explanation in your own words
+      </StageHeading>
       <p className="stage-intro">
         Respond to the question directly, then reconnect it to the original
         concept.
@@ -56,7 +59,7 @@ export function RepairStage({
       <div className="field repair-field">
         <div className="label-row">
           <label htmlFor="revised-explanation">Revised explanation</label>
-          <span aria-live="polite">{count.toLocaleString()} / 4,000</span>
+          <span>{count.toLocaleString()} / 4,000</span>
         </div>
         <textarea
           id="revised-explanation"
@@ -72,12 +75,15 @@ export function RepairStage({
         <p
           id="repair-guidance"
           className={showLengthError ? "field-error" : "field-hint"}
+          role="status"
         >
           {count === 0
             ? "Use 80–4,000 characters so the conceptual change is clear."
             : count < 80
-              ? `${80 - count} more characters needed`
-              : "Ready to compare with your first explanation"}
+              ? "At least 80 characters required"
+              : count > 4_000
+                ? `${count - 4_000} ${count - 4_000 === 1 ? "character" : "characters"} over the 4,000 limit`
+                : "Ready to compare with your first explanation"}
         </p>
       </div>
 
@@ -93,20 +99,20 @@ export function RepairStage({
       <div className="stage-actions">
         <button
           type="button"
-          className="secondary-button"
-          disabled={busy}
-          onClick={onBack}
-        >
-          Back to reasoning map
-        </button>
-        <button
-          type="button"
           disabled={!isValid || busy}
           onClick={onVerify}
         >
           {busy
             ? "Checking the repair…"
             : "Check my repaired understanding"}
+        </button>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={busy}
+          onClick={onBack}
+        >
+          Back to reasoning map
         </button>
       </div>
     </section>

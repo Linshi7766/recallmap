@@ -70,13 +70,32 @@ export const RepairNodeSchema = ReasoningNodeSchema.extend({
   repairExplanation: z.string().min(8).max(300),
 });
 
-export const RepairResultSchema = z.object({
-  nodes: z.array(RepairNodeSchema).min(3).max(5),
-  overallStatus: z.enum(["repaired", "partial", "not_repaired"]),
-  before: z.string().min(8).max(360),
-  after: z.string().min(8).max(360),
-  recallCard: z.string().min(15).max(420),
-});
+export const RepairResultSchema = z
+  .object({
+    nodes: z.array(RepairNodeSchema).min(3).max(5),
+    overallStatus: z.enum(["repaired", "partial", "not_repaired"]),
+    before: z.string().min(8).max(360),
+    after: z.string().min(8).max(360),
+    recallCard: z.string().min(15).max(420).nullable(),
+  })
+  .superRefine((value, ctx) => {
+    const hasCard = value.recallCard !== null;
+    if (value.overallStatus === "repaired" && !hasCard) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["recallCard"],
+        message: "Repaired outcomes require a recall card",
+      });
+    }
+
+    if (value.overallStatus !== "repaired" && hasCard) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["recallCard"],
+        message: "Unresolved outcomes must not provide a recall card",
+      });
+    }
+  });
 
 const SessionIdSchema = z.string().uuid();
 const StudentExplanationSchema = z.string().min(80).max(4_000);

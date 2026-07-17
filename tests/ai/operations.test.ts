@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { StructuredCallOptions } from "@/lib/ai/client";
+import { callStructured } from "@/lib/ai/client";
 import type { StructuredCaller } from "@/lib/ai/operations";
 import {
   diagnoseExplanation,
@@ -125,17 +126,35 @@ const NEUTRAL_PROBE: Probe = {
 };
 
 const REPAIR: RepairResult = {
-  nodes: DIAGNOSIS.nodes.map((node) => ({
-    ...node,
-    previousStatus: node.status,
-    status: "correct" as const,
-    repairExplanation: "The revised explanation now addresses this point.",
-  })),
+  nodes: DIAGNOSIS.nodes.map((node, index) => {
+    const repaired =
+      index === 1
+        ? {
+            claim: "Correlation alone cannot establish causation",
+            diagnosis:
+              "The revised reasoning now distinguishes association from causation.",
+          }
+        : index === 2
+          ? {
+              claim:
+                "Reverse causation, common causes, bias, and chance are alternatives",
+              diagnosis:
+                "The revised reasoning now names the main alternative explanations.",
+            }
+          : {};
+
+    return {
+      ...node,
+      ...repaired,
+      previousStatus: node.status,
+      status: "correct" as const,
+      repairExplanation: "The revised explanation now addresses this point.",
+    };
+  }),
   overallStatus: "repaired",
   before: ORIGINAL,
   after: REVISED,
-  recallCard:
-    "Correlation describes co-variation; causation needs evidence that rules out plausible alternatives.",
+  recallCard: "Correlation alone cannot establish causation",
 };
 
 type AnyOptions = StructuredCallOptions<unknown>;
@@ -156,6 +175,26 @@ function fakeCaller<T>(result: T) {
 
 function onlyCall(call: StructuredCaller): AnyOptions {
   return vi.mocked(call).mock.calls[0]?.[0] as AnyOptions;
+}
+
+const VERIFY_INPUT = {
+  source: SOURCE,
+  firstExplanation: ORIGINAL,
+  revisedExplanation: REVISED,
+  diagnosis: DIAGNOSIS,
+  probe: PROBE,
+  sessionId: SESSION_ID,
+};
+
+async function repairValidation(
+  diagnosis: Diagnosis = DIAGNOSIS,
+  seedRepair: RepairResult = REPAIR,
+) {
+  const call = fakeCaller(seedRepair);
+  await verifyRepair({ ...VERIFY_INPUT, diagnosis }, call);
+  const validate = onlyCall(call).validate;
+  if (!validate) throw new Error("Expected repair validation");
+  return validate as (value: RepairResult) => void;
 }
 
 function expectSharedSafetyInstructions(instructions: string) {
@@ -489,6 +528,15 @@ describe("grounded learning operations", () => {
     expect(options.instructions).toMatch(
       /never retain a misconception claim.*relabel it correct/i,
     );
+    expect(options.instructions).toMatch(
+      /recallCard must be null.*partial.*not_repaired/i,
+    );
+    expect(options.instructions).toMatch(
+      /repaired.*recall card.*supported current nodes/i,
+    );
+    expect(options.instructions).toMatch(
+      /recall card.*exactly match.*supported current node claim/i,
+    );
     for (const tag of [
       "original_explanation",
       "revised_explanation",
@@ -497,6 +545,232 @@ describe("grounded learning operations", () => {
     ]) {
       expectTagSafety(options.instructions, tag);
     }
+  });
+
+  it("rejects repair nodes whose ordered IDs differ from the diagnosis", async () => {
+    const validate = await repairValidation();
+    const reordered = {
+      ...REPAIR,
+      nodes: [REPAIR.nodes[1], REPAIR.nodes[0], REPAIR.nodes[2]],
+    } as RepairResult;
+
+    expect(() => validate(reordered)).toThrow(/node ids and order/i);
+  });
+
+  it("rejects fabricated previous node statuses", async () => {
+    const validate = await repairValidation();
+    const fabricated = {
+      ...REPAIR,
+      nodes: REPAIR.nodes.map((node, index) =>
+        index === 0
+          ? { ...node, previousStatus: "misconception" as const }
+          : node,
+      ),
+    };
+
+    expect(() => validate(fabricated)).toThrow(/previousStatus/i);
+  });
+
+  it("rejects a repair result that loses the priority node identity", async () => {
+    const validate = await repairValidation();
+    const missingPriority = {
+      ...REPAIR,
+      nodes: REPAIR.nodes.map((node, index) =>
+        index === 1 ? { ...node, id: "node-4" as const } : node,
+      ),
+    };
+
+    expect(() => validate(missingPriority)).toThrow(/priority node identity/i);
+  });
+
+  it("requires overall status to agree with the current priority status", async () => {
+    const validate = await repairValidation();
+    const partialWithRepairedPriority = {
+      ...REPAIR,
+      overallStatus: "partial" as const,
+      recallCard: null,
+    } as unknown as RepairResult;
+    const repairedWithUnresolvedPriority = {
+      ...REPAIR,
+      nodes: REPAIR.nodes.map((node, index) =>
+        index === 1
+          ? {
+              ...node,
+              claim: DIAGNOSIS.nodes[1].claim,
+              diagnosis: DIAGNOSIS.nodes[1].diagnosis,
+              status: "misconception" as const,
+            }
+          : node,
+      ),
+    };
+
+    expect(() => validate(partialWithRepairedPriority)).toThrow(
+      /overall status.*priority/i,
+    );
+    expect(() => validate(repairedWithUnresolvedPriority)).toThrow(
+      /overall status.*priority/i,
+    );
+  });
+
+  it("requires transfer outcomes to agree with their current node states", async () => {
+    const transferDiagnosis: Diagnosis = {
+      nodes: DIAGNOSIS.nodes.map((node) => ({
+        ...node,
+        status: "correct" as const,
+      })),
+      priorityNodeId: null,
+    };
+    const supportedNodes = transferDiagnosis.nodes.map((node) => ({
+      ...node,
+      previousStatus: node.status,
+      repairExplanation:
+        "The transfer response preserves this supported reasoning link.",
+    }));
+    const validate = await repairValidation(transferDiagnosis, {
+      ...REPAIR,
+      nodes: supportedNodes,
+      recallCard: supportedNodes[0].claim,
+    });
+
+    expect(() =>
+      validate({
+        ...REPAIR,
+        nodes: supportedNodes,
+        overallStatus: "partial",
+        recallCard: null,
+      }),
+    ).toThrow(/transfer status.*current nodes/i);
+    expect(() =>
+      validate({
+        ...REPAIR,
+        nodes: supportedNodes,
+        overallStatus: "not_repaired",
+        recallCard: null,
+      }),
+    ).toThrow(/transfer status.*current nodes/i);
+    expect(() =>
+      validate({
+        ...REPAIR,
+        nodes: supportedNodes.map((node, index) =>
+          index === 1 ? { ...node, status: "incomplete" as const } : node,
+        ),
+        overallStatus: "repaired",
+        recallCard: supportedNodes[0].claim,
+      }),
+    ).toThrow(/transfer status.*current nodes/i);
+  });
+
+  it.each(["repaired", "partial", "not_repaired"] as const)(
+    "allows a coherent %s transfer outcome when the diagnosis has no priority gap",
+    async (overallStatus) => {
+      const transferDiagnosis: Diagnosis = {
+        nodes: DIAGNOSIS.nodes.map((node) => ({
+          ...node,
+          status: "correct" as const,
+        })),
+        priorityNodeId: null,
+      };
+      const supportedNodes = transferDiagnosis.nodes.map((node) => ({
+        ...node,
+        previousStatus: node.status,
+        repairExplanation:
+          "The transfer response preserves this supported reasoning link.",
+      }));
+      const transferRepair = {
+        ...REPAIR,
+        nodes:
+          overallStatus === "repaired"
+            ? supportedNodes
+            : supportedNodes.map((node, index) =>
+                index === 1
+                  ? {
+                      ...node,
+                      status:
+                        overallStatus === "partial"
+                          ? ("incomplete" as const)
+                          : ("misconception" as const),
+                    }
+                  : node,
+              ),
+        overallStatus,
+        recallCard:
+          overallStatus === "repaired" ? supportedNodes[0].claim : null,
+      } as RepairResult;
+      const validate = await repairValidation(transferDiagnosis, {
+        ...REPAIR,
+        nodes: supportedNodes,
+        recallCard: supportedNodes[0].claim,
+      });
+
+      expect(() => validate(transferRepair)).not.toThrow();
+    },
+  );
+
+  it("rejects a status-only relabel when a non-correct node becomes correct", async () => {
+    const validate = await repairValidation();
+    const relabeled = {
+      ...REPAIR,
+      nodes: REPAIR.nodes.map((node, index) =>
+        index === 1
+          ? {
+              ...node,
+              claim: DIAGNOSIS.nodes[1].claim,
+              diagnosis: DIAGNOSIS.nodes[1].diagnosis,
+            }
+          : node,
+      ),
+    };
+
+    expect(() => validate(relabeled)).toThrow(/change both claim and diagnosis/i);
+  });
+
+  it("rejects a repaired recall card that repeats an original non-correct claim", async () => {
+    const validate = await repairValidation();
+    const unsafeCard = {
+      ...REPAIR,
+      recallCard: `${DIAGNOSIS.nodes[1].claim}. Keep this as the main rule.`,
+    };
+
+    expect(() => validate(unsafeCard)).toThrow(/recall card.*non-correct claim/i);
+  });
+
+  it("rejects a repaired recall card that does not match a supported current claim", async () => {
+    const validate = await repairValidation();
+    const unsupportedCard = {
+      ...REPAIR,
+      recallCard:
+        "An unrelated memory rule can be retained without any supporting node.",
+    };
+
+    expect(() => validate(unsupportedCard)).toThrow(
+      /recall card.*supported current claim/i,
+    );
+  });
+
+  it("retries an input-invalid repair result before accepting a coherent result", async () => {
+    const relabeled = {
+      ...REPAIR,
+      nodes: REPAIR.nodes.map((node, index) =>
+        index === 1
+          ? {
+              ...node,
+              claim: DIAGNOSIS.nodes[1].claim,
+              diagnosis: DIAGNOSIS.nodes[1].diagnosis,
+            }
+          : node,
+      ),
+    };
+    const parse = vi
+      .fn()
+      .mockResolvedValueOnce({ output_parsed: relabeled })
+      .mockResolvedValueOnce({ output_parsed: REPAIR });
+    const retryingCall = ((options: AnyOptions) =>
+      callStructured({ ...options, parse })) as StructuredCaller;
+
+    await expect(verifyRepair(VERIFY_INPUT, retryingCall)).resolves.toEqual(
+      REPAIR,
+    );
+    expect(parse).toHaveBeenCalledTimes(2);
   });
 
   it("rejects repair evidence that is absent from the source", async () => {

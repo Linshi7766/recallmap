@@ -13,6 +13,7 @@ const STATUS_LABEL: Record<NodeStatus, string> = {
 
 type ReasoningMapProps = {
   diagnosis: Diagnosis;
+  ariaLabelledBy: string;
   showChanges?: boolean;
 };
 
@@ -22,10 +23,11 @@ function isRepairNode(node: Diagnosis["nodes"][number]): node is RepairNode {
 
 export function ReasoningMap({
   diagnosis,
+  ariaLabelledBy,
   showChanges = false,
 }: ReasoningMapProps) {
   return (
-    <ol className="reasoning-map" aria-label="Reasoning map">
+    <ol className="reasoning-map" aria-labelledby={ariaLabelledBy}>
       {diagnosis.nodes.map((node, index) => {
         const isPriority = diagnosis.priorityNodeId === node.id;
         const tentative = node.confidence < 0.6;
