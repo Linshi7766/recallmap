@@ -11,3 +11,9 @@ it("keeps the generated Next type shim ignored and untracked", () => {
   expect(ignoreRules).toContain("/next-env.d.ts");
   expect(trackedShim).toBe("");
 });
+
+it("keeps isolated worktrees out of repository-wide lint", () => {
+  const eslintConfig = readFileSync("eslint.config.mjs", "utf8");
+
+  expect(eslintConfig).toContain('".worktrees/**"');
+});
