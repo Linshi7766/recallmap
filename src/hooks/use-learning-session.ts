@@ -34,11 +34,21 @@ export function useLearningSession() {
   const sessionRef = useRef(session);
   const busyRef = useRef(false);
   const hydratedRef = useRef(false);
+  const mountedRef = useRef(true);
+  const requestGenerationRef = useRef(0);
 
   const transition = useCallback((event: LearningEvent) => {
     const next = learningSessionReducer(sessionRef.current, event);
     sessionRef.current = next;
     setSession(next);
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestGenerationRef.current += 1;
+    };
   }, []);
 
   useEffect(() => {
@@ -71,29 +81,38 @@ export function useLearningSession() {
     }
   }, [hydrated, session]);
 
-  const runExclusive = useCallback(async (operation: () => Promise<void>) => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setBusy(true);
-    setError(null);
+  const runExclusive = useCallback(
+    async (operation: (isCurrent: () => boolean) => Promise<void>) => {
+      if (busyRef.current || !mountedRef.current) return;
+      const generation = ++requestGenerationRef.current;
+      const isCurrent = () =>
+        mountedRef.current && requestGenerationRef.current === generation;
+      busyRef.current = true;
+      setBusy(true);
+      setError(null);
 
-    try {
-      await operation();
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
-  }, []);
+      try {
+        await operation(isCurrent);
+      } catch (caught) {
+        if (isCurrent()) setError(errorMessage(caught));
+      } finally {
+        if (isCurrent()) {
+          busyRef.current = false;
+          setBusy(false);
+        }
+      }
+    },
+    [],
+  );
 
   const start = useCallback(
     (source: LessonSource) => {
       if (!hydratedRef.current) return;
-      void runExclusive(async () => {
+      void runExclusive(async (isCurrent) => {
         transition({ type: "RESET" });
         transition({ type: "SOURCE_SELECTED", source });
         const challenge = await requestChallenge(sessionRef.current.id, source);
+        if (!isCurrent()) return;
         transition({ type: "CHALLENGE_READY", challenge });
       });
     },
@@ -101,7 +120,7 @@ export function useLearningSession() {
   );
 
   const analyze = useCallback(() => {
-    void runExclusive(async () => {
+    void runExclusive(async (isCurrent) => {
       const current = sessionRef.current;
       if (!current.source || !current.challenge) return;
       const result = await requestDiagnosis(
@@ -110,12 +129,13 @@ export function useLearningSession() {
         current.challenge,
         current.firstExplanation,
       );
+      if (!isCurrent()) return;
       transition({ type: "DIAGNOSIS_READY", ...result });
     });
   }, [runExclusive, transition]);
 
   const verify = useCallback(() => {
-    void runExclusive(async () => {
+    void runExclusive(async (isCurrent) => {
       const current = sessionRef.current;
       if (
         !current.source ||
@@ -134,6 +154,7 @@ export function useLearningSession() {
         current.probe,
         current.revisedExplanation,
       );
+      if (!isCurrent()) return;
       transition({ type: "REPAIR_READY", repair });
     });
   }, [runExclusive, transition]);
@@ -142,6 +163,30 @@ export function useLearningSession() {
     if (busyRef.current) return;
     setError(null);
     transition({ type: "BACK" });
+  }, [transition]);
+
+  const resume = useCallback(() => {
+    if (busyRef.current) return;
+    const current = sessionRef.current;
+    if (current.stage !== "start" || !current.source || !current.challenge) {
+      return;
+    }
+    setError(null);
+    transition({ type: "CHALLENGE_READY", challenge: current.challenge });
+  }, [transition]);
+
+  const backToTeachback = useCallback(() => {
+    if (busyRef.current) return;
+    setError(null);
+    let remainingTransitions = 3;
+    while (
+      sessionRef.current.stage !== "teachback" &&
+      sessionRef.current.stage !== "start" &&
+      remainingTransitions > 0
+    ) {
+      transition({ type: "BACK" });
+      remainingTransitions -= 1;
+    }
   }, [transition]);
 
   const reset = useCallback(() => {
@@ -175,6 +220,8 @@ export function useLearningSession() {
     analyze,
     verify,
     back,
+    resume,
+    backToTeachback,
     reset,
     changeFirstExplanation,
     changeRevisedExplanation,

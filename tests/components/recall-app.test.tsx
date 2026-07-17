@@ -12,6 +12,11 @@ import { Progress } from "@/components/recall/progress";
 import { SAMPLE_LESSON } from "@/lib/domain/sample-lesson";
 import type { Challenge, LessonSource } from "@/lib/domain/contracts";
 import type { LearningSession } from "@/lib/domain/session";
+import {
+  DEMO_DIAGNOSIS,
+  DEMO_PROBE,
+  DEMO_REPAIR,
+} from "@/lib/fixtures/demo-fallback";
 
 const CHALLENGE: Challenge = {
   lessonTitle: "Correlation vs. Causation",
@@ -35,6 +40,14 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 function challengeResponse(challenge: Challenge = CHALLENGE): Response {
   return jsonResponse({ ok: true, data: challenge, fallback: false });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }
 
 function createRestoredSession(
@@ -70,9 +83,10 @@ it("introduces Recall as a guided misconception detector", async () => {
       name: /can you explain what you think you know/i,
     }),
   ).toBeInTheDocument();
-  expect(
-    await screen.findByRole("button", { name: /start sample lesson/i }),
-  ).toBeEnabled();
+  const start = screen.getByRole("button", { name: /start sample lesson/i });
+  await waitFor(() => expect(start).toBeEnabled());
+  expect(screen.getByText(/progress saved in this browser/i)).toBeVisible();
+  expect(screen.queryByText(/private to this browser/i)).not.toBeInTheDocument();
   expect(screen.queryByRole("log")).not.toBeInTheDocument();
 });
 
@@ -133,6 +147,9 @@ it("shows inline errors for invalid pasted material without requesting a challen
   await user.click(screen.getByRole("button", { name: /use this material/i }));
 
   expect(screen.getByText(/at least 240 characters/i)).toBeInTheDocument();
+  expect(
+    screen.getByText(/sent for ai analysis.*not stored in a server database/i),
+  ).toBeVisible();
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
@@ -254,10 +271,20 @@ it("confirms lesson replacement and clears the previous explanation", async () =
   await user.click(screen.getByRole("button", { name: /^back$/i }));
   await user.click(screen.getByRole("button", { name: /start sample lesson/i }));
 
-  expect(screen.getByRole("alertdialog")).toHaveTextContent(
-    /replace your current lesson/i,
-  );
+  const confirmation = screen.getByRole("group", {
+    name: /replace your current lesson/i,
+  });
+  expect(confirmation).toBeVisible();
+  expect(screen.getByRole("button", { name: /keep current lesson/i })).toHaveFocus();
   expect(fetchMock).toHaveBeenCalledTimes(1);
+
+  await user.keyboard("{Escape}");
+  expect(confirmation).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: /start sample lesson/i }),
+  ).toHaveFocus();
+
+  await user.click(screen.getByRole("button", { name: /start sample lesson/i }));
 
   await user.click(
     screen.getByRole("button", { name: /replace current lesson/i }),
@@ -268,6 +295,82 @@ it("confirms lesson replacement and clears the previous explanation", async () =
   expect(screen.getByLabelText(/your explanation/i)).toHaveValue("");
 });
 
+it("continues a backed-out lesson with the exact prompt and answer without fetching", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(challengeResponse());
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", { name: /start sample lesson/i }),
+  );
+  await user.type(await screen.findByLabelText(/your explanation/i), LONG_EXPLANATION);
+  await user.click(screen.getByRole("button", { name: /^back$/i }));
+
+  await user.click(
+    screen.getByRole("button", { name: /continue current lesson/i }),
+  );
+
+  expect(screen.getByRole("heading", { name: CHALLENGE.prompt })).toBeVisible();
+  expect(screen.getByLabelText(/your explanation/i)).toHaveValue(LONG_EXPLANATION);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+const ADVANCED_SESSIONS = [
+  ["diagnosis", { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE }],
+  ["repair", { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE }],
+  [
+    "result",
+    { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE, repair: DEMO_REPAIR },
+  ],
+] as const;
+
+it.each(ADVANCED_SESSIONS)(
+  "restored %s stage can return to the preserved teachback",
+  async (stage, data) => {
+    localStorage.setItem(
+      "recall.session.v1",
+      JSON.stringify(createRestoredSession({ stage, ...data })),
+    );
+    vi.stubGlobal("fetch", vi.fn());
+    const user = userEvent.setup();
+
+    render(<RecallApp />);
+    await user.click(
+      await screen.findByRole("button", { name: /back to my explanation/i }),
+    );
+
+    expect(screen.getByRole("heading", { name: CHALLENGE.prompt })).toBeVisible();
+    expect(screen.getByLabelText(/your explanation/i)).toHaveValue(
+      LONG_EXPLANATION,
+    );
+  },
+);
+
+it.each(ADVANCED_SESSIONS)(
+  "restored %s stage can start over without a blank trap",
+  async (stage, data) => {
+    localStorage.setItem(
+      "recall.session.v1",
+      JSON.stringify(createRestoredSession({ stage, ...data })),
+    );
+    vi.stubGlobal("fetch", vi.fn());
+    const user = userEvent.setup();
+
+    render(<RecallApp />);
+    await user.click(
+      await screen.findByRole("button", { name: /start over/i }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: /start sample lesson/i }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByText(/your reasoning map is ready/i),
+    ).not.toBeInTheDocument();
+  },
+);
+
 it("ignores corrupt or outdated persisted sessions", async () => {
   localStorage.setItem(
     "recall.session.v1",
@@ -277,9 +380,8 @@ it("ignores corrupt or outdated persisted sessions", async () => {
 
   render(<RecallApp />);
 
-  expect(
-    await screen.findByRole("button", { name: /start sample lesson/i }),
-  ).toBeEnabled();
+  const start = screen.getByRole("button", { name: /start sample lesson/i });
+  await waitFor(() => expect(start).toBeEnabled());
   await waitFor(() => {
     const stored = JSON.parse(
       localStorage.getItem("recall.session.v1") ?? "{}",
@@ -288,6 +390,62 @@ it("ignores corrupt or outdated persisted sessions", async () => {
     expect(stored.stage).toBe("start");
     expect(stored.id).toMatch(/^[0-9a-f-]{36}$/i);
   });
+});
+
+it("ignores a late challenge resolution after unmount", async () => {
+  const pending = deferred<Response>();
+  vi.stubGlobal("fetch", vi.fn().mockReturnValue(pending.promise));
+  const user = userEvent.setup();
+  const view = render(<RecallApp />);
+  const start = screen.getByRole("button", { name: /start sample lesson/i });
+  await waitFor(() => expect(start).toBeEnabled());
+  await user.click(start);
+  await waitFor(() =>
+    expect(
+      JSON.parse(localStorage.getItem("recall.session.v1") ?? "{}"),
+    ).toMatchObject({ stage: "start", challenge: null }),
+  );
+
+  view.unmount();
+  pending.resolve(challengeResponse());
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(
+    JSON.parse(localStorage.getItem("recall.session.v1") ?? "{}"),
+  ).toMatchObject({ stage: "start", challenge: null });
+});
+
+it("ignores a late diagnosis resolution after unmount", async () => {
+  const pending = deferred<Response>();
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(challengeResponse())
+    .mockReturnValueOnce(pending.promise);
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+  const view = render(<RecallApp />);
+  await user.click(
+    await screen.findByRole("button", { name: /start sample lesson/i }),
+  );
+  await user.type(await screen.findByLabelText(/your explanation/i), LONG_EXPLANATION);
+  await user.click(screen.getByRole("button", { name: /reveal my blind spot/i }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  view.unmount();
+
+  pending.resolve(
+    jsonResponse({
+      ok: true,
+      data: { diagnosis: DEMO_DIAGNOSIS, probe: DEMO_PROBE },
+      fallback: false,
+    }),
+  );
+  await Promise.resolve();
+  await Promise.resolve();
+
+  expect(
+    JSON.parse(localStorage.getItem("recall.session.v1") ?? "{}"),
+  ).toMatchObject({ stage: "teachback", diagnosis: null, probe: null });
 });
 
 it("continues when localStorage is unavailable", async () => {

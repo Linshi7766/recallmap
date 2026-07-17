@@ -13,7 +13,7 @@ export function RecallApp() {
     <main className="shell">
       <header className="app-header">
         <span className="brand">RECALL</span>
-        <span className="privacy-note">Private to this browser</span>
+        <span className="privacy-note">Progress saved in this browser</span>
       </header>
       <div className="focus-card">
         <Progress stage={session.stage} />
@@ -24,6 +24,7 @@ export function RecallApp() {
             error={learning.error}
             hasExistingLesson={session.challenge !== null}
             onStart={learning.start}
+            onResume={learning.resume}
           />
         ) : null}
         {session.stage === "teachback" && session.challenge ? (
@@ -41,6 +42,22 @@ export function RecallApp() {
           <section className="stage stage-placeholder" aria-live="polite">
             <p className="eyebrow">ANALYSIS READY</p>
             <h1>Your reasoning map is ready for the next step.</h1>
+            <p>
+              The visual analysis arrives in the next build. Your work is
+              safely preserved.
+            </p>
+            <div className="stage-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={learning.reset}
+              >
+                Start over
+              </button>
+              <button type="button" onClick={learning.backToTeachback}>
+                Back to my explanation
+              </button>
+            </div>
           </section>
         ) : null}
       </div>

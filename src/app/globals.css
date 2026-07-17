@@ -109,7 +109,7 @@ button, summary { -webkit-tap-highlight-color: transparent; }
 }
 
 .lede { margin: 0; color: var(--muted); font-size: 1.08rem; }
-.sample-card {
+.sample-card, .resume-card {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 24px;
@@ -123,6 +123,12 @@ button, summary { -webkit-tap-highlight-color: transparent; }
 
 .sample-card h2 { margin: 6px 0; font-size: 1.35rem; }
 .sample-card p:not(.card-label) { margin: 0; color: var(--muted); line-height: 1.55; }
+.resume-card {
+  margin-top: 28px;
+  border-color: #c4b5fd;
+  background: var(--violet-soft);
+}
+.resume-card h2 { margin: 5px 0 0; font-size: 1.1rem; }
 
 button {
   border: 0;
@@ -162,6 +168,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .label-row span, .field-hint { color: var(--muted); font-size: .78rem; }
 .field-hint, .field-error { margin: 0; }
 .field-error { color: #b91c1c; font-size: .82rem; font-weight: 650; }
+.privacy-disclosure { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
 
 input, textarea {
   width: 100%;
@@ -214,11 +221,11 @@ div.error-banner { display: flex; align-items: center; justify-content: space-be
   .privacy-note { display: none; }
   .focus-card { border-radius: 18px; }
   .progress { padding-inline: 16px; }
-  .progress li { justify-content: center; font-size: 0; }
+  .progress li { flex-direction: column; justify-content: flex-start; gap: 5px; text-align: center; font-size: .62rem; }
   .progress li span { font-size: .7rem; }
   .stage { padding: 34px 22px; }
-  .sample-card { grid-template-columns: 1fr; }
-  .sample-card button { width: 100%; }
+  .sample-card, .resume-card { grid-template-columns: 1fr; }
+  .sample-card button, .resume-card button { width: 100%; }
   div.error-banner { align-items: stretch; flex-direction: column; }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { LessonSourceSchema, type LessonSource } from "@/lib/domain/contracts";
 import { normalizeSourceText } from "@/lib/domain/evidence";
 import { SAMPLE_LESSON } from "@/lib/domain/sample-lesson";
@@ -11,9 +11,11 @@ type StartStageProps = {
   error: string | null;
   hasExistingLesson: boolean;
   onStart: (source: LessonSource) => void;
+  onResume: () => void;
 };
 
 type FormErrors = { title?: string; text?: string };
+type StartOrigin = "sample" | "pasted";
 
 export function StartStage({
   ready,
@@ -21,18 +23,86 @@ export function StartStage({
   error,
   hasExistingLesson,
   onStart,
+  onResume,
 }: StartStageProps) {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
-  const [pendingSource, setPendingSource] = useState<LessonSource | null>(null);
+  const [pending, setPending] = useState<{
+    source: LessonSource;
+    origin: StartOrigin;
+  } | null>(null);
+  const sampleTriggerRef = useRef<HTMLButtonElement>(null);
+  const pastedTriggerRef = useRef<HTMLButtonElement>(null);
+  const keepButtonRef = useRef<HTMLButtonElement>(null);
 
-  function requestStart(source: LessonSource) {
+  useEffect(() => {
+    if (pending) keepButtonRef.current?.focus();
+  }, [pending]);
+
+  function triggerFor(origin: StartOrigin) {
+    return origin === "sample"
+      ? sampleTriggerRef.current
+      : pastedTriggerRef.current;
+  }
+
+  function closeConfirmation() {
+    const origin = pending?.origin;
+    setPending(null);
+    if (origin) triggerFor(origin)?.focus();
+  }
+
+  function requestStart(source: LessonSource, origin: StartOrigin) {
     if (hasExistingLesson) {
-      setPendingSource(source);
+      setPending({ source, origin });
       return;
     }
     onStart(source);
+  }
+
+  function replacementConfirmation(origin: StartOrigin) {
+    if (pending?.origin !== origin) return null;
+    return (
+      <div
+        className="replace-confirmation"
+        role="group"
+        aria-labelledby={`replace-title-${origin}`}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeConfirmation();
+          }
+        }}
+      >
+        <div>
+          <h2 id={`replace-title-${origin}`}>Replace your current lesson?</h2>
+          <p>
+            This clears the explanations and analysis saved for your current
+            lesson.
+          </p>
+        </div>
+        <div className="confirmation-actions">
+          <button
+            ref={keepButtonRef}
+            type="button"
+            className="secondary-button"
+            onClick={closeConfirmation}
+          >
+            Keep current lesson
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const source = pending.source;
+              setPending(null);
+              onStart(source);
+            }}
+          >
+            Replace current lesson
+          </button>
+        </div>
+      </div>
+    );
   }
 
   function submitPasted(event: FormEvent<HTMLFormElement>) {
@@ -65,7 +135,7 @@ export function StartStage({
       text: normalizedText,
     });
     setErrors({});
-    requestStart(source);
+    requestStart(source, "pasted");
   }
 
   return (
@@ -78,39 +148,15 @@ export function StartStage({
 
       {error ? <p className="error-banner" role="alert">{error}</p> : null}
 
-      {pendingSource ? (
-        <div
-          className="replace-confirmation"
-          role="alertdialog"
-          aria-labelledby="replace-title"
-          aria-describedby="replace-description"
-        >
+      {hasExistingLesson ? (
+        <div className="resume-card">
           <div>
-            <h2 id="replace-title">Replace your current lesson?</h2>
-            <p id="replace-description">
-              This clears the explanations and analysis saved for your current
-              lesson.
-            </p>
+            <p className="card-label">IN PROGRESS</p>
+            <h2>Pick up where you left off</h2>
           </div>
-          <div className="confirmation-actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setPendingSource(null)}
-            >
-              Keep current lesson
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const source = pendingSource;
-                setPendingSource(null);
-                onStart(source);
-              }}
-            >
-              Replace current lesson
-            </button>
-          </div>
+          <button type="button" disabled={!ready || busy} onClick={onResume}>
+            Continue current lesson
+          </button>
         </div>
       ) : null}
 
@@ -124,17 +170,23 @@ export function StartStage({
           </p>
         </div>
         <button
+          ref={sampleTriggerRef}
           type="button"
           disabled={!ready || busy}
-          onClick={() => requestStart(SAMPLE_LESSON)}
+          onClick={() => requestStart(SAMPLE_LESSON, "sample")}
         >
           {busy ? "Preparing your prompt…" : "Start sample lesson"}
         </button>
       </article>
+      {replacementConfirmation("sample")}
 
       <details className="paste-panel">
         <summary>Paste your own material</summary>
         <form onSubmit={submitPasted} noValidate>
+          <p className="privacy-disclosure">
+            Your content is sent for AI analysis and is not stored in a server
+            database.
+          </p>
           <div className="field">
             <label htmlFor="lesson-title">Lesson title</label>
             <input
@@ -167,9 +219,14 @@ export function StartStage({
               <p className="field-hint">240–12,000 characters</p>
             )}
           </div>
-          <button type="submit" disabled={!ready || busy}>
+          <button
+            ref={pastedTriggerRef}
+            type="submit"
+            disabled={!ready || busy}
+          >
             {busy ? "Preparing your prompt…" : "Use this material"}
           </button>
+          {replacementConfirmation("pasted")}
         </form>
       </details>
     </section>
