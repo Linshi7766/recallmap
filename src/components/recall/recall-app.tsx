@@ -27,7 +27,7 @@ export function RecallApp({
   return (
     <main className="shell">
       <header className="app-header">
-        <span className="brand">RECALL</span>
+        <span className="brand">RECALLMAP</span>
         <span className="privacy-note">Progress saved in this browser</span>
       </header>
       <div className="focus-card">

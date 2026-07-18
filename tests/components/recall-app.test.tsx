@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { metadata } from "@/app/layout";
 import Page, { dynamic } from "@/app/page";
 import { RecallApp } from "@/components/recall/recall-app";
 import { Progress } from "@/components/recall/progress";
@@ -263,9 +264,16 @@ it("forces the home page to resolve its provider label at request time", () => {
   expect(dynamic).toBe("force-dynamic");
 });
 
-it("introduces Recall as a guided misconception detector", async () => {
+it("introduces RecallMap as a guided misconception detector", async () => {
   vi.stubGlobal("fetch", vi.fn());
   render(<Page />);
+
+  expect(metadata.title).toBe("RecallMap");
+  expect(screen.getByText("RECALLMAP")).toBeVisible();
+  expect(
+    screen.getByText("Teach it back. RecallMap finds the hidden gap."),
+  ).toBeVisible();
+  expect(screen.queryByText(/^RECALL$/)).not.toBeInTheDocument();
 
   const heading = screen.getByRole("heading", {
     name: /can you explain what you think you know/i,

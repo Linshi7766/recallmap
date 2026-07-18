@@ -146,7 +146,7 @@ export function StartStage({
         <StageHeading id="start-heading">
           Can you explain what you think you know?
         </StageHeading>
-        <p className="lede">Teach it back. Recall finds the hidden gap.</p>
+        <p className="lede">Teach it back. RecallMap finds the hidden gap.</p>
       </div>
 
       {error ? <p className="error-banner" role="alert">{error}</p> : null}

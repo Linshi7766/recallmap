@@ -29,7 +29,7 @@ export function TeachbackStage({
       <p className="concept">{challenge.concept}</p>
       <StageHeading id="prompt-heading">{challenge.prompt}</StageHeading>
       <p className="stage-intro">
-        Explain it in your own words. Recall will look at the reasoning, not
+        Explain it in your own words. RecallMap will look at the reasoning, not
         polish or vocabulary.
       </p>
 
