@@ -388,32 +388,107 @@ it("redacts an unavailable SDK failure while retaining the final cause", async (
   expect(parse).toHaveBeenCalledTimes(2);
 });
 
-it("uses the reduced MiMo Responses payload when only MIMO_API_KEY exists", async () => {
+it("uses MiMo JSON object mode and validates raw output text", async () => {
   vi.stubEnv("OPENAI_API_KEY", "");
   vi.stubEnv("MIMO_API_KEY", "test-mimo-key");
-  const parse = vi.fn().mockResolvedValue({ output_parsed: { value: "ok" } });
-
-  await expect(callStructured({ ...options, parse })).resolves.toEqual({
-    value: "ok",
+  const create = vi.fn().mockResolvedValue({
+    output_text: JSON.stringify({ value: "ok" }),
   });
+  const parse = vi.fn(() => {
+    throw new Error("MiMo must not use responses.parse");
+  });
+  const validate = vi.fn();
 
-  const request = parse.mock.calls[0]?.[0];
+  await expect(
+    callStructured({ ...options, create, parse, validate }),
+  ).resolves.toEqual({ value: "ok" });
+
+  expect(parse).not.toHaveBeenCalled();
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(validate).toHaveBeenCalledWith({ value: "ok" });
+  const request = create.mock.calls[0]?.[0];
+  const expectedJsonSchema = JSON.stringify(z.toJSONSchema(Output));
   expect(request).toMatchObject({
     model: "mimo-v2.5",
     reasoning: { effort: "medium" },
-    instructions: options.instructions,
+    instructions: [
+      options.instructions,
+      "Return exactly one JSON object and no surrounding text.",
+      "The JSON object must match this exact JSON Schema:",
+      expectedJsonSchema,
+    ].join("\n\n"),
     input: options.input,
-    text: {
-      format: expect.objectContaining({
-        type: "json_schema",
-        name: "test",
-        strict: true,
-      }),
-    },
+    text: { format: { type: "json_object" } },
   });
+  expect(request.instructions).not.toContain(options.input);
   expect(request).not.toHaveProperty("store");
   expect(request).not.toHaveProperty("safety_identifier");
   expect(request.text).not.toHaveProperty("verbosity");
+  expect(request.text.format).not.toHaveProperty("name");
+  expect(request.text.format).not.toHaveProperty("schema");
+  expect(request.text.format).not.toHaveProperty("strict");
+});
+
+it("retries malformed MiMo JSON once without reflecting raw output", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("MIMO_API_KEY", "test-mimo-key");
+  const create = vi
+    .fn()
+    .mockResolvedValueOnce({ output_text: SENTINEL_RAW_OUTPUT })
+    .mockResolvedValueOnce({ output_text: JSON.stringify({ value: "ok" }) });
+  const parse = vi.fn(() => {
+    throw new Error("MiMo must not use responses.parse");
+  });
+
+  await expect(
+    callStructured({ ...options, input: SENTINEL_INPUT, create, parse }),
+  ).resolves.toEqual({ value: "ok" });
+
+  expect(parse).not.toHaveBeenCalled();
+  expect(create).toHaveBeenCalledTimes(2);
+  const secondInput = String(create.mock.calls[1]?.[0].input);
+  expect(secondInput).toBe(
+    `${SENTINEL_INPUT}\n\n<validation_feedback>\n` +
+      "The previous structured response failed validation.\n" +
+      "- format code=invalid_json\n" +
+      "Return a corrected structured response. Do not repeat or quote prior values.\n" +
+      "</validation_feedback>",
+  );
+  expect(secondInput).not.toContain(SENTINEL_RAW_OUTPUT);
+});
+
+it("redacts malformed MiMo JSON after the bounded retry", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("MIMO_API_KEY", "test-mimo-key");
+  const create = vi.fn().mockResolvedValue({
+    output_text: SENTINEL_RAW_OUTPUT,
+  });
+  const parse = vi.fn(() => {
+    throw new Error("MiMo must not use responses.parse");
+  });
+
+  const error = await callStructured({
+    ...options,
+    instructions: SENTINEL_INSTRUCTIONS,
+    input: SENTINEL_INPUT,
+    create,
+    parse,
+  }).catch((reason: unknown) => reason);
+
+  expect(error).toMatchObject({
+    code: "MODEL_OUTPUT_INVALID",
+    message: "MODEL_OUTPUT_INVALID",
+    cause: {
+      name: "MalformedJsonError",
+      message: "Invalid JSON model output",
+    },
+  } satisfies Partial<StructuredModelError>);
+  expect(create).toHaveBeenCalledTimes(2);
+  const publicFailure = `${String(error)} ${String(
+    (error as StructuredModelError).cause,
+  )} ${String(create.mock.calls[1]?.[0].input)}`;
+  expect(publicFailure).not.toContain(SENTINEL_INSTRUCTIONS);
+  expect(publicFailure).not.toContain(SENTINEL_RAW_OUTPUT);
 });
 
 it("returns MODEL_UNAVAILABLE before parsing when neither key exists", async () => {

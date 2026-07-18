@@ -8,7 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import Page from "@/app/page";
+import Page, { dynamic } from "@/app/page";
 import { RecallApp } from "@/components/recall/recall-app";
 import { Progress } from "@/components/recall/progress";
 import {
@@ -257,6 +257,10 @@ it("shows the server-selected MiMo provider without exposing its key", () => {
 
   expect(screen.getByText("AI provider: MiMo V2.5")).toBeInTheDocument();
   expect(screen.queryByText(/mimo-secret-value/)).not.toBeInTheDocument();
+});
+
+it("forces the home page to resolve its provider label at request time", () => {
+  expect(dynamic).toBe("force-dynamic");
 });
 
 it("introduces Recall as a guided misconception detector", async () => {

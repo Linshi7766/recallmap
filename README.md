@@ -28,11 +28,13 @@ The final screen makes the conceptual change inspectable through a Before/After 
 
 5. Select **Check my repaired understanding** to see the repaired reasoning map and Before/After result.
 
-## How GPT-5.6 is used
+## How live providers are used
 
-The primary implementation calls `gpt-5.6` through the OpenAI Responses API when `OPENAI_API_KEY` is configured. This is the competition path: four server-side model operations generate the open teachback prompt, diagnose three to five reasoning nodes, generate one targeted probe, and compare the original and revised explanations. Every model response uses strict structured outputs parsed into Zod contracts; evidence excerpts are additionally checked against the normalized source text before display.
+The primary implementation calls `gpt-5.6` through the OpenAI Responses API when `OPENAI_API_KEY` is configured. This is the competition path: four server-side model operations generate the open teachback prompt, diagnose three to five reasoning nodes, generate one targeted probe, and compare the original and revised explanations. OpenAI uses server-enforced strict JSON Schema through `responses.parse`, followed by the application's Zod and domain checks.
 
-When OpenAI credentials are unavailable and `MIMO_API_KEY` is configured, the hosted application uses Xiaomi `mimo-v2.5` through its OpenAI-compatible Responses API. The interface identifies this provider as MiMo V2.5; MiMo output is never represented as GPT-5.6 output. OpenAI takes priority if both keys are configured.
+When OpenAI credentials are unavailable and `MIMO_API_KEY` is configured, the application can use Xiaomi `mimo-v2.5` through its OpenAI-compatible Responses API. MiMo uses JSON object mode: trusted instructions require one JSON object and include the exact JSON Schema derived from the operation's Zod contract, while lesson and user content remain in `input`. The raw `output_text` is parsed as JSON and validated locally with the same Zod and domain checks, including one bounded repair retry. The interface identifies this provider as MiMo V2.5; MiMo output is never represented as GPT-5.6 output. OpenAI takes priority if both keys are configured.
+
+Live non-demo MiMo acceptance is still pending. Automated tests validate the local request, parsing, retry, and redaction behavior without claiming that production credentials or the live Xiaomi endpoint have been accepted.
 
 Every live request uses medium reasoning and a server-only credential. OpenAI requests additionally use `store: false` and a privacy-preserving session UUID as `safety_identifier`. Model refusals and invalid or unavailable responses are handled as typed failures rather than being displayed as invented learning feedback.
 
@@ -51,7 +53,7 @@ Browser Guided UI
   ├─ localStorage: recoverable active session and student progress
   └─ POST /api/learn: source, explanations, and typed prior-stage data
        └─ server-only selected live provider gateway
-            ├─ selected-provider Responses API structured outputs
+            ├─ OpenAI strict JSON Schema or MiMo JSON object response
             ├─ Zod contract validation
             └─ exact source-evidence verification
 ```

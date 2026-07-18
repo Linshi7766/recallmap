@@ -40,3 +40,13 @@ it("describes generic live analysis through the selected provider", () => {
   expect(readme).not.toContain("Recall attempts live `gpt-5.6` first");
   expect(readme).not.toContain("never calls the real OpenAI API");
 });
+
+it("distinguishes OpenAI strict schema enforcement from MiMo local validation", () => {
+  const readme = readFileSync("README.md", "utf8");
+
+  expect(readme).toContain("server-enforced strict JSON Schema");
+  expect(readme).toContain("MiMo uses JSON object mode");
+  expect(readme).toContain("raw `output_text` is parsed as JSON");
+  expect(readme).toContain("validated locally with the same Zod and domain checks");
+  expect(readme).toContain("Live non-demo MiMo acceptance is still pending");
+});
