@@ -56,7 +56,12 @@ it("distinguishes OpenAI strict schema enforcement from MiMo local validation", 
   expect(readme).toContain(
     "Controlled non-demo MiMo production HTTP acceptance passed on 2026-07-18 with `fallback=false`.",
   );
+  expect(readme).toContain("OpenAI GPT-5.6 requests use medium reasoning.");
+  expect(readme).toContain(
+    "On the current public deployment, MiMo V2.5 requests use reasoning effort `none`, a 2,048-token cap, and a 75-second timeout.",
+  );
   expect(readme).not.toMatch(/Live non-demo MiMo acceptance is still pending/i);
+  expect(readme).not.toContain("Every live request uses medium reasoning");
 });
 
 it("truthfully discloses the current and supported runtime providers", () => {

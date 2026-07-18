@@ -34,7 +34,7 @@ The selected server provider performs the runtime analysis. The current public d
 
 GPT-5.6 is supported through the OpenAI Responses API when `OPENAI_API_KEY` is configured, and OpenAI takes priority when both keys exist. OpenAI uses server-enforced strict JSON Schema through `responses.parse`, followed by the application's Zod and domain checks. MiMo uses JSON object mode: trusted instructions require one JSON object and include the exact JSON Schema derived from the operation's Zod contract, while lesson and user content remain in `input`. The raw `output_text` is parsed as JSON and validated locally with the same Zod and domain checks, including one bounded repair retry. The interface identifies this provider as MiMo V2.5; MiMo output is never represented as GPT-5.6 output.
 
-Every live request uses medium reasoning and a server-only credential. OpenAI requests additionally use `store: false` and a privacy-preserving session UUID as `safety_identifier`. Model refusals and invalid or unavailable responses are handled as typed failures rather than being displayed as invented learning feedback.
+OpenAI GPT-5.6 requests use medium reasoning. They additionally use `store: false` and a privacy-preserving session UUID as `safety_identifier`. On the current public deployment, MiMo V2.5 requests use reasoning effort `none`, a 2,048-token cap, and a 75-second timeout. Model refusals and invalid or unavailable responses are handled as typed failures rather than being displayed as invented learning feedback.
 
 The exact scripted path described above remains the only answer path eligible for the disclosed built-in demo fallback. The fallback is considered only after an eligible live availability failure or invalid structured output.
 
