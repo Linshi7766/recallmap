@@ -246,6 +246,17 @@ afterEach(() => {
   localStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
+it("shows the server-selected MiMo provider without exposing its key", () => {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("MIMO_API_KEY", "mimo-secret-value");
+
+  render(<Page />);
+
+  expect(screen.getByText("AI provider: MiMo V2.5")).toBeInTheDocument();
+  expect(screen.queryByText(/mimo-secret-value/)).not.toBeInTheDocument();
 });
 
 it("introduces Recall as a guided misconception detector", async () => {

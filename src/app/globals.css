@@ -50,6 +50,14 @@ button, summary { -webkit-tap-highlight-color: transparent; }
   box-shadow: 0 26px 70px rgb(15 23 42 / 10%);
 }
 
+.provider-note {
+  width: min(760px, 100%);
+  margin: 12px auto 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
 .progress {
   padding: 22px clamp(20px, 5vw, 44px);
   border-bottom: 1px solid var(--line);

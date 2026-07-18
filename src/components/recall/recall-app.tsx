@@ -8,7 +8,13 @@ import { ResultStage } from "./result-stage";
 import { StartStage } from "./start-stage";
 import { TeachbackStage } from "./teachback-stage";
 
-export function RecallApp() {
+type RecallAppProps = {
+  providerLabel?: string;
+};
+
+export function RecallApp({
+  providerLabel = "Configured by the server",
+}: RecallAppProps) {
   const learning = useLearningSession();
   const { session } = learning;
   const hasDiagnosis = session.diagnosis !== null && session.probe !== null;
@@ -93,6 +99,7 @@ export function RecallApp() {
           </section>
         ) : null}
       </div>
+      <p className="provider-note">AI provider: {providerLabel}</p>
     </main>
   );
 }
