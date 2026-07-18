@@ -12,7 +12,7 @@ export type AiProviderConfig = {
 
 type ProviderEnvironment = Partial<
   Pick<NodeJS.ProcessEnv, "OPENAI_API_KEY" | "MIMO_API_KEY">
->;
+> & { [key: string]: string | undefined };
 
 function configured(value: string | undefined): value is string {
   return typeof value === "string" && value.trim().length > 0;
