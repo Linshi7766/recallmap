@@ -8,9 +8,12 @@ import {
   ModelUnavailableError,
   StructuredModelError,
 } from "@/lib/ai/errors";
+import {
+  resolveAiProvider,
+  type AiProviderConfig,
+  type AiProviderId,
+} from "@/lib/ai/provider";
 import { ModelOutputValidationError } from "@/lib/domain/output-validation";
-
-const MODEL = "gpt-5.6";
 
 type StructuredResponse = {
   output_parsed: unknown;
@@ -32,20 +35,19 @@ export type StructuredCallOptions<T> = {
 };
 
 let client: OpenAI | undefined;
+let clientProviderId: AiProviderId | undefined;
 
-function getClient(): OpenAI {
-  client ??= new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    timeout: 25_000,
-    maxRetries: 0,
-  });
+function getClient(provider: AiProviderConfig): OpenAI {
+  if (client === undefined || clientProviderId !== provider.id) {
+    client = new OpenAI({
+      apiKey: provider.apiKey,
+      baseURL: provider.baseURL,
+      timeout: 25_000,
+      maxRetries: 0,
+    });
+    clientProviderId = provider.id;
+  }
   return client;
-}
-
-async function defaultParse(
-  request: ResponseParseParams,
-): Promise<StructuredResponse> {
-  return getClient().responses.parse(request);
 }
 
 function hasModelRefusal(response: StructuredResponse): boolean {
@@ -69,6 +71,39 @@ function hasModelRefusal(response: StructuredResponse): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function structuredRequest<T>(
+  provider: AiProviderConfig,
+  options: Pick<
+    StructuredCallOptions<T>,
+    "schema" | "schemaName" | "instructions" | "safetyIdentifier"
+  > & { input: string },
+): ResponseParseParams {
+  const textFormat = zodTextFormat(options.schema, options.schemaName);
+  const common = {
+    model: provider.model,
+    reasoning: { effort: "medium" as const },
+    instructions: options.instructions,
+    input: options.input,
+  };
+
+  if (provider.id === "mimo") {
+    return {
+      ...common,
+      text: { format: textFormat },
+    };
+  }
+
+  return {
+    ...common,
+    store: false,
+    safety_identifier: options.safetyIdentifier,
+    text: {
+      format: textFormat,
+      verbosity: "low",
+    },
+  };
 }
 
 function isUnavailableSdkError(error: unknown): boolean {
@@ -159,32 +194,33 @@ export async function callStructured<T>({
   instructions,
   input,
   safetyIdentifier,
-  parse = defaultParse,
+  parse,
   validate,
 }: StructuredCallOptions<T>): Promise<T> {
+  const provider = resolveAiProvider();
+  if (provider === null) {
+    throw new ModelUnavailableError();
+  }
+  const parseRequest: StructuredParse =
+    parse ?? ((request) => getClient(provider).responses.parse(request));
   let lastError: unknown;
   let validationFeedback: string | undefined;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const request: ResponseParseParams = {
-      model: MODEL,
-      reasoning: { effort: "medium" },
-      store: false,
-      safety_identifier: safetyIdentifier,
+    const request = structuredRequest(provider, {
+      schema,
+      schemaName,
       instructions,
+      safetyIdentifier,
       input:
         validationFeedback === undefined
           ? input
           : `${input}\n\n${validationFeedback}`,
-      text: {
-        format: zodTextFormat(schema, schemaName),
-        verbosity: "low",
-      },
-    };
+    });
 
     let response: StructuredResponse;
     try {
-      response = await parse(request);
+      response = await parseRequest(request);
     } catch (error) {
       if (!isUnavailableSdkError(error)) {
         throw error;

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StructuredCallOptions } from "@/lib/ai/client";
 import { callStructured } from "@/lib/ai/client";
 import type { StructuredCaller } from "@/lib/ai/operations";
@@ -35,6 +35,15 @@ const REVISED =
 const ALL_CORRECT_EXPLANATION =
   "Correlation describes variables moving together, but causation needs added evidence that rules out reverse causation, common causes, selection bias, and chance.";
 const VALIDATION_SENTINEL = "raw-validation-sentinel";
+
+beforeEach(() => {
+  vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
+  vi.stubEnv("MIMO_API_KEY", "");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const CHALLENGE: Challenge = {
   lessonTitle: SOURCE.title,

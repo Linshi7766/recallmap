@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { callStructured } from "@/lib/ai/client";
 import {
@@ -21,6 +21,15 @@ const options = {
 const SENTINEL_INSTRUCTIONS = "instructions-sentinel";
 const SENTINEL_INPUT = "input-sentinel";
 const SENTINEL_RAW_OUTPUT = "raw-output-sentinel";
+
+beforeEach(() => {
+  vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
+  vi.stubEnv("MIMO_API_KEY", "");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 it("returns parsed structured output with the required Responses payload", async () => {
   const parse = vi.fn().mockResolvedValue({ output_parsed: { value: "ok" } });
@@ -377,4 +386,43 @@ it("redacts an unavailable SDK failure while retaining the final cause", async (
     SENTINEL_RAW_OUTPUT,
   );
   expect(parse).toHaveBeenCalledTimes(2);
+});
+
+it("uses the reduced MiMo Responses payload when only MIMO_API_KEY exists", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("MIMO_API_KEY", "test-mimo-key");
+  const parse = vi.fn().mockResolvedValue({ output_parsed: { value: "ok" } });
+
+  await expect(callStructured({ ...options, parse })).resolves.toEqual({
+    value: "ok",
+  });
+
+  const request = parse.mock.calls[0]?.[0];
+  expect(request).toMatchObject({
+    model: "mimo-v2.5",
+    reasoning: { effort: "medium" },
+    instructions: options.instructions,
+    input: options.input,
+    text: {
+      format: expect.objectContaining({
+        type: "json_schema",
+        name: "test",
+        strict: true,
+      }),
+    },
+  });
+  expect(request).not.toHaveProperty("store");
+  expect(request).not.toHaveProperty("safety_identifier");
+  expect(request.text).not.toHaveProperty("verbosity");
+});
+
+it("returns MODEL_UNAVAILABLE before parsing when neither key exists", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("MIMO_API_KEY", "");
+  const parse = vi.fn();
+
+  await expect(callStructured({ ...options, parse })).rejects.toBeInstanceOf(
+    ModelUnavailableError,
+  );
+  expect(parse).not.toHaveBeenCalled();
 });
