@@ -1,7 +1,10 @@
 import OpenAI from "openai";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { callStructured } from "@/lib/ai/client";
+import {
+  callStructured,
+  getProviderTimeoutMs,
+} from "@/lib/ai/client";
 import {
   ModelUnavailableError,
   StructuredModelError,
@@ -29,6 +32,11 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+});
+
+it("uses a longer request timeout only for MiMo", () => {
+  expect(getProviderTimeoutMs("mimo")).toBe(45_000);
+  expect(getProviderTimeoutMs("openai")).toBe(25_000);
 });
 
 it("returns parsed structured output with the required Responses payload", async () => {

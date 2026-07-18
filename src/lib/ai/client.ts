@@ -50,12 +50,18 @@ export type StructuredCallOptions<T> = {
 let client: OpenAI | undefined;
 let clientProviderId: AiProviderId | undefined;
 
+export function getProviderTimeoutMs(
+  providerId: AiProviderId,
+): 25_000 | 45_000 {
+  return providerId === "mimo" ? 45_000 : 25_000;
+}
+
 function getClient(provider: AiProviderConfig): OpenAI {
   if (client === undefined || clientProviderId !== provider.id) {
     client = new OpenAI({
       apiKey: provider.apiKey,
       baseURL: provider.baseURL,
-      timeout: 25_000,
+      timeout: getProviderTimeoutMs(provider.id),
       maxRetries: 0,
     });
     clientProviderId = provider.id;
