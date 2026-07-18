@@ -45,12 +45,16 @@ export type LearningApiErrorCode =
   | "NETWORK_ERROR";
 
 const ERROR_MESSAGES: Record<LearningApiErrorCode, string> = {
-  INVALID_INPUT: "Recall could not accept that learning input.",
-  MODEL_REFUSED: "Recall cannot analyze this material.",
-  MODEL_UNAVAILABLE: "Recall is temporarily unavailable. Please try again.",
-  INTERNAL_ERROR: "Recall encountered an unexpected error. Please try again.",
-  INVALID_RESPONSE: "Recall could not validate the learning service response.",
-  NETWORK_ERROR: "Recall could not reach the learning service. Please try again.",
+  INVALID_INPUT: "RecallMap could not accept that learning input.",
+  MODEL_REFUSED: "RecallMap cannot analyze this material.",
+  MODEL_UNAVAILABLE:
+    "RecallMap is temporarily unavailable. Please try again.",
+  INTERNAL_ERROR:
+    "RecallMap encountered an unexpected error. Please try again.",
+  INVALID_RESPONSE:
+    "RecallMap could not validate the learning service response.",
+  NETWORK_ERROR:
+    "RecallMap could not reach the learning service. Please try again.",
 };
 
 export class LearningApiError extends Error {

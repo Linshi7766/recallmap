@@ -50,7 +50,37 @@ it("distinguishes OpenAI strict schema enforcement from MiMo local validation", 
   expect(readme).toContain("MiMo uses JSON object mode");
   expect(readme).toContain("raw `output_text` is parsed as JSON");
   expect(readme).toContain("validated locally with the same Zod and domain checks");
-  expect(readme).toContain("Live non-demo MiMo acceptance is still pending");
+  expect(readme).toContain(
+    "The current public deployment uses Xiaomi MiMo V2.5 through an OpenAI-compatible Responses API.",
+  );
+  expect(readme).toContain(
+    "Controlled non-demo MiMo production HTTP acceptance passed on 2026-07-18 with `fallback=false`.",
+  );
+  expect(readme).not.toMatch(/Live non-demo MiMo acceptance is still pending/i);
+});
+
+it("truthfully discloses the current and supported runtime providers", () => {
+  const readme = readFileSync("README.md", "utf8");
+  const demoScript = readFileSync("docs/demo-script.md", "utf8");
+
+  for (const publicSurface of [readme, demoScript]) {
+    expect(publicSurface).toContain(
+      "The selected server provider performs the runtime analysis.",
+    );
+    expect(publicSurface).toContain(
+      "The current public deployment uses Xiaomi MiMo V2.5 through an OpenAI-compatible Responses API.",
+    );
+    expect(publicSurface).toContain(
+      "GPT-5.6 is supported through the OpenAI Responses API when `OPENAI_API_KEY` is configured, and OpenAI takes priority when both keys exist.",
+    );
+    expect(publicSurface).toContain(
+      "Controlled non-demo MiMo production HTTP acceptance passed on 2026-07-18 with `fallback=false`.",
+    );
+    expect(publicSurface).toContain(
+      "Codex was the development tool, not the runtime tutor.",
+    );
+    expect(publicSurface).not.toMatch(/MiMo acceptance is still pending/i);
+  }
 });
 
 it("uses RecallMap across current public project surfaces", () => {

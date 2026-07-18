@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   LearningApiError,
   requestChallenge,
@@ -49,7 +50,7 @@ it("runtime-validates challenge data inside the stable success envelope", async 
   expect(error).toBeInstanceOf(LearningApiError);
   expect(error).toMatchObject({
     code: "INVALID_RESPONSE",
-    message: "Recall could not validate the learning service response.",
+    message: "RecallMap could not validate the learning service response.",
   });
   expect(error).not.toHaveProperty("cause");
   expect(JSON.stringify(error)).not.toContain("invalid");
@@ -78,9 +79,75 @@ it("maps server failures to a stable code and generic local message", async () =
 
   expect(error).toMatchObject({
     code: "MODEL_UNAVAILABLE",
-    message: "Recall is temporarily unavailable. Please try again.",
+    message: "RecallMap is temporarily unavailable. Please try again.",
   });
   expect(JSON.stringify(error)).not.toContain("sensitive server detail");
+});
+
+it("keeps the unexpected client fallback branded as RecallMap", () => {
+  const learningSession = readFileSync(
+    "src/hooks/use-learning-session.ts",
+    "utf8",
+  );
+
+  expect(learningSession).toContain(
+    "RecallMap encountered an unexpected error. Please try again.",
+  );
+  expect(learningSession).not.toContain(
+    "Recall encountered an unexpected error. Please try again.",
+  );
+});
+
+it.each([
+  ["INVALID_INPUT", 400, "RecallMap could not accept that learning input."],
+  ["MODEL_REFUSED", 422, "RecallMap cannot analyze this material."],
+  [
+    "MODEL_UNAVAILABLE",
+    503,
+    "RecallMap is temporarily unavailable. Please try again.",
+  ],
+  [
+    "INTERNAL_ERROR",
+    500,
+    "RecallMap encountered an unexpected error. Please try again.",
+  ],
+])(
+  "uses RecallMap copy for the %s server failure",
+  async (code, status, message) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          { ok: false, error: { code, message: "sensitive server detail" } },
+          status,
+        ),
+      ),
+    );
+
+    await expect(requestChallenge(SESSION_ID, SAMPLE_LESSON)).rejects.toMatchObject({
+      code,
+      message,
+    });
+  },
+);
+
+it("uses RecallMap copy for malformed response and network failures", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(new Response("not-json", { status: 200 })),
+  );
+
+  await expect(requestChallenge(SESSION_ID, SAMPLE_LESSON)).rejects.toMatchObject({
+    code: "INVALID_RESPONSE",
+    message: "RecallMap could not validate the learning service response.",
+  });
+
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+
+  await expect(requestChallenge(SESSION_ID, SAMPLE_LESSON)).rejects.toMatchObject({
+    code: "NETWORK_ERROR",
+    message: "RecallMap could not reach the learning service. Please try again.",
+  });
 });
 
 it("classifies malformed JSON as an invalid response rather than a network error", async () => {
@@ -100,7 +167,7 @@ it("classifies malformed JSON as an invalid response rather than a network error
 
   expect(error).toMatchObject({
     code: "INVALID_RESPONSE",
-    message: "Recall could not validate the learning service response.",
+    message: "RecallMap could not validate the learning service response.",
   });
 });
 

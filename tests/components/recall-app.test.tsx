@@ -949,7 +949,7 @@ it("preserves the exact revised explanation when verification fails and retries 
   });
   expect(revised).toHaveValue(DEMO_REVISED_EXPLANATION);
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "Recall is temporarily unavailable. Please try again.",
+    "RecallMap is temporarily unavailable. Please try again.",
   );
   expect(
     JSON.parse(localStorage.getItem("recall.session.v1") ?? "{}"),

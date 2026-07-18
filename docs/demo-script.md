@@ -1,6 +1,6 @@
 # RecallMap three-minute demo script
 
-Target length: 3:00. Spoken narration is 307 words; bracketed cues are visual directions, not narration.
+Target length: 3:00. Spoken narration is 322 words; bracketed cues are visual directions, not narration.
 
 ### 0:00–0:18 — The hidden problem
 
@@ -48,7 +48,7 @@ Target length: 3:00. Spoken narration is 307 words; bracketed cues are visual di
 
 [Show the result, then briefly show the repository test/docs view.]
 
-“At runtime, GPT-5.6 uses Responses API structured outputs for source-grounded misconception diagnosis, targeted counterexample challenge generation, and conceptual comparison between explanations. Codex researched constraints; designed the architecture, structured-output contracts, and UI; implemented the app; and tested failure recovery. It is not the runtime tutor. The exact built-in fallback runs only after an eligible live failure. Pasted material never falls back.”
+“The selected server provider performs the runtime analysis. The current public deployment uses Xiaomi MiMo V2.5 through an OpenAI-compatible Responses API. GPT-5.6 is supported through the OpenAI Responses API when `OPENAI_API_KEY` is configured, and OpenAI takes priority when both keys exist. Controlled non-demo MiMo production HTTP acceptance passed on 2026-07-18 with `fallback=false`. Codex was the development tool, not the runtime tutor. The exact built-in fallback runs only after an eligible live failure. Pasted material never falls back.”
 
 ### 2:50–3:00 — Close
 

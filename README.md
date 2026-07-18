@@ -30,11 +30,9 @@ The final screen makes the conceptual change inspectable through a Before/After 
 
 ## How live providers are used
 
-The primary implementation calls `gpt-5.6` through the OpenAI Responses API when `OPENAI_API_KEY` is configured. This is the competition path: four server-side model operations generate the open teachback prompt, diagnose three to five reasoning nodes, generate one targeted probe, and compare the original and revised explanations. OpenAI uses server-enforced strict JSON Schema through `responses.parse`, followed by the application's Zod and domain checks.
+The selected server provider performs the runtime analysis. The current public deployment uses Xiaomi MiMo V2.5 through an OpenAI-compatible Responses API. Controlled non-demo MiMo production HTTP acceptance passed on 2026-07-18 with `fallback=false`.
 
-When OpenAI credentials are unavailable and `MIMO_API_KEY` is configured, the application can use Xiaomi `mimo-v2.5` through its OpenAI-compatible Responses API. MiMo uses JSON object mode: trusted instructions require one JSON object and include the exact JSON Schema derived from the operation's Zod contract, while lesson and user content remain in `input`. The raw `output_text` is parsed as JSON and validated locally with the same Zod and domain checks, including one bounded repair retry. The interface identifies this provider as MiMo V2.5; MiMo output is never represented as GPT-5.6 output. OpenAI takes priority if both keys are configured.
-
-Live non-demo MiMo acceptance is still pending. Automated tests validate the local request, parsing, retry, and redaction behavior without claiming that production credentials or the live Xiaomi endpoint have been accepted.
+GPT-5.6 is supported through the OpenAI Responses API when `OPENAI_API_KEY` is configured, and OpenAI takes priority when both keys exist. OpenAI uses server-enforced strict JSON Schema through `responses.parse`, followed by the application's Zod and domain checks. MiMo uses JSON object mode: trusted instructions require one JSON object and include the exact JSON Schema derived from the operation's Zod contract, while lesson and user content remain in `input`. The raw `output_text` is parsed as JSON and validated locally with the same Zod and domain checks, including one bounded repair retry. The interface identifies this provider as MiMo V2.5; MiMo output is never represented as GPT-5.6 output.
 
 Every live request uses medium reasoning and a server-only credential. OpenAI requests additionally use `store: false` and a privacy-preserving session UUID as `safety_identifier`. Model refusals and invalid or unavailable responses are handled as typed failures rather than being displayed as invented learning feedback.
 
@@ -44,7 +42,7 @@ The exact scripted path described above remains the only answer path eligible fo
 
 Codex researched the product and API constraints, turned the design into an implementation plan, implemented the Next.js application and its typed boundaries, and built the unit, component, route, and browser test coverage. Codex also exercised failure recovery and responsive behavior during development.
 
-Codex is not a tutor running inside RecallMap. The selected live provider performs the source-grounded learning analysis at runtime; Codex was the development tool used to research, plan, implement, and test the project.
+Codex was the development tool, not the runtime tutor. The selected server provider performs the source-grounded learning analysis at runtime.
 
 ## Architecture
 

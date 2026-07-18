@@ -18,7 +18,8 @@ import {
 } from "@/lib/domain/session";
 
 const STORAGE_KEY = "recall.session.v1";
-const UNKNOWN_ERROR = "Recall encountered an unexpected error. Please try again.";
+const UNKNOWN_ERROR =
+  "RecallMap encountered an unexpected error. Please try again.";
 
 function errorMessage(error: unknown): string {
   return error instanceof LearningApiError ? error.message : UNKNOWN_ERROR;
