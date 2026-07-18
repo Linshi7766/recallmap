@@ -286,6 +286,22 @@ it.each([
 });
 
 it.each([
+  ["rate limits", new OpenAI.RateLimitError(429, {}, "rate limited", new Headers())],
+  ["timeouts", new OpenAI.APIConnectionTimeoutError()],
+  ["HTTP timeouts", new OpenAI.APIError(408, {}, "request timeout", new Headers())],
+  ["server errors", new OpenAI.InternalServerError(500, {}, "server", new Headers())],
+])("does not automatically retry MiMo SDK %s", async (_name, error) => {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  vi.stubEnv("MIMO_API_KEY", "test-mimo-key");
+  const create = vi.fn().mockRejectedValue(error);
+
+  await expect(
+    callStructured({ ...options, create }),
+  ).rejects.toBeInstanceOf(ModelUnavailableError);
+  expect(create).toHaveBeenCalledTimes(1);
+});
+
+it.each([
   [
     "authentication failures",
     new OpenAI.AuthenticationError(401, {}, "invalid key", new Headers()),

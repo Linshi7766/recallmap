@@ -301,6 +301,9 @@ export async function callStructured<T>({
         throw error;
       }
       lastError = error;
+      if (provider.id === "mimo") {
+        break;
+      }
       continue;
     }
 
