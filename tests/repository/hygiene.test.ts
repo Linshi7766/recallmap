@@ -33,11 +33,11 @@ it("describes generic live analysis through the selected provider", () => {
 
   expect(readme).toContain("server-only selected live provider gateway");
   expect(readme).toContain("dispatches four focused selected-provider calls");
-  expect(readme).toContain("Recall attempts the selected live provider first");
+  expect(readme).toContain("RecallMap attempts the selected live provider first");
   expect(readme).toContain("never calls a real provider API");
   expect(readme).not.toContain("server-only GPT-5.6 gateway");
   expect(readme).not.toContain("dispatches four focused GPT-5.6 calls");
-  expect(readme).not.toContain("Recall attempts live `gpt-5.6` first");
+  expect(readme).not.toContain("RecallMap attempts live `gpt-5.6` first");
   expect(readme).not.toContain("never calls the real OpenAI API");
 });
 
@@ -49,4 +49,23 @@ it("distinguishes OpenAI strict schema enforcement from MiMo local validation", 
   expect(readme).toContain("raw `output_text` is parsed as JSON");
   expect(readme).toContain("validated locally with the same Zod and domain checks");
   expect(readme).toContain("Live non-demo MiMo acceptance is still pending");
+});
+
+it("uses RecallMap across current public project surfaces", () => {
+  const readme = readFileSync("README.md", "utf8");
+  const demoScript = readFileSync("docs/demo-script.md", "utf8");
+  const submissionChecklist = readFileSync(
+    "docs/submission-checklist.md",
+    "utf8",
+  );
+  const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
+  const packageLock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+
+  expect(readme).toMatch(/^# RecallMap$/m);
+  expect(demoScript).toMatch(/^# RecallMap three-minute demo script$/m);
+  expect(submissionChecklist).toMatch(/^# RecallMap submission checklist$/m);
+  expect(packageJson.name).toBe("recallmap");
+  expect(packageJson.description).toBe("RecallMap misconception detector");
+  expect(packageLock.name).toBe("recallmap");
+  expect(packageLock.packages[""].name).toBe("recallmap");
 });

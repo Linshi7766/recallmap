@@ -1,24 +1,24 @@
-# Recall three-minute demo script
+# RecallMap three-minute demo script
 
 Target length: 3:00. Spoken narration is 307 words; bracketed cues are visual directions, not narration.
 
 ### 0:00–0:18 — The hidden problem
 
-[Open Recall on the start screen.]
+[Open RecallMap on the start screen.]
 
-“Students can recognize a correct answer while still carrying the wrong mental model. Recall makes that hidden misunderstanding visible, then asks the student to repair it in their own words.”
+“Students can recognize a correct answer while still carrying the wrong mental model. RecallMap makes that hidden misunderstanding visible, then asks the student to repair it in their own words.”
 
 ### 0:18–0:36 — Start without friction
 
 [Select **Start sample lesson**.]
 
-“A judge can start this built-in statistics lesson without a Recall account or personal API key. The lesson asks why ice-cream sales and drowning incidents can move together without one causing the other.”
+“A judge can start this built-in statistics lesson without a RecallMap account or personal API key. The lesson asks why ice-cream sales and drowning incidents can move together without one causing the other.”
 
 ### 0:36–0:58 — Expose the reasoning
 
 [Enter the tested first explanation and select **Reveal my blind spot**.]
 
-“I’ll give a plausible misconception: if two variables consistently move together, one probably causes the other unless the data has an error. Recall does not reward polished wording. It examines the reasoning against the supplied material.”
+“I’ll give a plausible misconception: if two variables consistently move together, one probably causes the other unless the data has an error. RecallMap does not reward polished wording. It examines the reasoning against the supplied material.”
 
 ### 0:58–1:27 — Reveal the gap with evidence
 
@@ -42,7 +42,7 @@ Target length: 3:00. Spoken narration is 307 words; bracketed cues are visual di
 
 [Select **Check my repaired understanding**. Show the green repaired node and Before/After card.]
 
-“The priority node turns supported, and Before/After shows the conceptual change. Recall verifies repaired reasoning instead of merely supplying an answer.”
+“The priority node turns supported, and Before/After shows the conceptual change. RecallMap verifies repaired reasoning instead of merely supplying an answer.”
 
 ### 2:20–2:50 — Explain the technology and disclosure
 
@@ -52,4 +52,4 @@ Target length: 3:00. Spoken narration is 307 words; bracketed cues are visual di
 
 ### 2:50–3:00 — Close
 
-Recall doesn't replace thinking. It shows students where their thinking breaks—and helps them repair it.
+RecallMap doesn't replace thinking. It shows students where their thinking breaks—and helps them repair it.

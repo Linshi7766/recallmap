@@ -1,4 +1,4 @@
-# Recall submission checklist
+# RecallMap submission checklist
 
 Nothing in this checklist records deployment, publication, repository sharing, or submission completion yet. External actions remain pending explicit approval.
 

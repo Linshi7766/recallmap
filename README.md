@@ -1,16 +1,16 @@
-# Recall
+# RecallMap
 
 Explain it. Expose the gap. Repair your understanding.
 
 ## What it does
 
-Recall is a focused learning tool for exposing and repairing misconceptions. A student teaches a concept back in their own words, sees a source-grounded reasoning map, works through one targeted challenge, and revises the explanation. Recall then compares the original and revised reasoning and reports whether the important gap was repaired.
+RecallMap is a focused learning tool for exposing and repairing misconceptions. A student teaches a concept back in their own words, sees a source-grounded reasoning map, works through one targeted challenge, and revises the explanation. RecallMap then compares the original and revised reasoning and reports whether the important gap was repaired.
 
-The app includes a ready-to-run lesson on correlation and causation. It requires no Recall account, and the deployed experience is designed so a judge does not need a personal API key.
+The app includes a ready-to-run lesson on correlation and causation. It requires no RecallMap account, and the deployed experience is designed so a judge does not need a personal API key.
 
 ## Why it is different
 
-Recall does not begin by supplying a polished answer or another multiple-choice quiz. It first captures the student's mental model. It then separates supported reasoning from incomplete or unsupported links, quotes evidence from the supplied material, and asks exactly one counterexample, Socratic question, or transfer question. If every reasoning node is supported, it does not invent a mistake.
+RecallMap does not begin by supplying a polished answer or another multiple-choice quiz. It first captures the student's mental model. It then separates supported reasoning from incomplete or unsupported links, quotes evidence from the supplied material, and asks exactly one counterexample, Socratic question, or transfer question. If every reasoning node is supported, it does not invent a mistake.
 
 The final screen makes the conceptual change inspectable through a Before/After comparison, updated reasoning nodes, and—only for a repaired result—a short recall card.
 
@@ -44,7 +44,7 @@ The exact scripted path described above remains the only answer path eligible fo
 
 Codex researched the product and API constraints, turned the design into an implementation plan, implemented the Next.js application and its typed boundaries, and built the unit, component, route, and browser test coverage. Codex also exercised failure recovery and responsive behavior during development.
 
-Codex is not a tutor running inside Recall. The selected live provider performs the source-grounded learning analysis at runtime; Codex was the development tool used to research, plan, implement, and test the project.
+Codex is not a tutor running inside RecallMap. The selected live provider performs the source-grounded learning analysis at runtime; Codex was the development tool used to research, plan, implement, and test the project.
 
 ## Architecture
 
@@ -104,13 +104,13 @@ The E2E suite intercepts `/api/learn` and uses exported, contract-validated fixt
 
 ## Demo fallback disclosure
 
-Recall attempts the selected live provider first. A fallback is considered only when that live provider operation ends in an eligible availability failure or invalid structured output. It then matches the complete request against the built-in correlation-and-causation source and the exact scripted challenge, first explanation, diagnosis/probe, and revision exported by the application. A matching response is returned with `fallback: true`.
+RecallMap attempts the selected live provider first. A fallback is considered only when that live provider operation ends in an eligible availability failure or invalid structured output. It then matches the complete request against the built-in correlation-and-causation source and the exact scripted challenge, first explanation, diagnosis/probe, and revision exported by the application. A matching response is returned with `fallback: true`.
 
 The fallback is never used after a model refusal, for modified demo inputs, or for arbitrary pasted material. Pasted material always requires live analysis and receives an explicit error if the live model cannot complete the operation.
 
 ## Privacy and limitations
 
-Recoverable progress is stored in the current browser's `localStorage`; clearing site data removes it. Recall has no server database and does not create learner accounts.
+Recoverable progress is stored in the current browser's `localStorage`; clearing site data removes it. RecallMap has no server database and does not create learner accounts.
 
 The study material, prompt context, original and revised explanations, and relevant prior-stage analysis are sent through the server to the selected live provider: OpenAI when configured, otherwise Xiaomi MiMo. Provider credentials remain server-side. Review the applicable provider terms before submitting sensitive material; Xiaomi's compatibility documentation is available at <https://mimo.mi.com/docs/en-US/api/chat/responses>.
 
