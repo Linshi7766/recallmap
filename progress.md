@@ -24,9 +24,20 @@
 - DuckDNS 与 Let's Encrypt HTTPS 已配置。
 
 ### Phase 3：完整 AI 主流程
-- **Status:** in_progress
-- 当前阻塞：服务器尚未设置 `OPENAI_API_KEY`。
-- 当前能力：固定演示的 fallback 路径可用；任意材料的 live GPT-5.6 路径尚不可验收。
+- **Status:** blocked
+- 本地 MiMo provider 代码集成已提交：`OPENAI_API_KEY` 存在时 GPT-5.6 优先；否则 `MIMO_API_KEY` 选择 MiMo V2.5。
+- 新鲜阻塞：`npm run build` 在 `src/lib/ai/provider.ts:22` 报 TypeScript 类型错误（`process.env` 与 `ProviderEnvironment` 不兼容，exit 1）。在修复并重新完成门禁前，不可部署该集成。
+- 服务器 `MIMO_API_KEY` 仍 pending；本会话未连接或修改 Azure。需先确认精确的 systemd unit 名称，再通过 root 可读环境文件和 systemd drop-in 安全注入密钥。
+- live non-demo MiMo 验收仍 pending；不得将内置 fallback 或自动化 mock 视为生产验证。
+
+### Task 5：本地门禁与范围检查（2026-07-18）
+- **Status:** blocked（保留真实失败/未验证结果）
+- `npm run lint`：exit 0，ESLint 无报告错误。
+- `npm test`：exit 0，Vitest 11 个测试文件、165 项测试通过、0 失败。
+- `npm run test:e2e`：exit 124（本地 120 秒命令超时）。Playwright 输出 6 个 Chromium 用例均为 `ok`，但测试进程未自行退出；因此 E2E 不能记为通过。
+- `npm run build`：exit 1。优化编译完成，但 TypeScript 在 `src/lib/ai/provider.ts:22` 失败：`ProcessEnv` 与 `Partial<Pick<ProcessEnv, "OPENAI_API_KEY" | "MIMO_API_KEY">>` 不兼容。
+- `npm audit --omit=dev`：exit 1。registry `https://registry.npmmirror.com` 的 audit endpoint 返回 `NOT_IMPLEMENTED`；生产依赖漏洞状态未验证。
+- `git diff --check`：exit 0；文档更新前的 `git status --short` 和受限 `git diff -- src tests .env.example README.md task_plan.md findings.md progress.md` 均为空。另检查已提交的 `HEAD~5..HEAD`：仅计划内 `.env.example`、README、`src` 与 `tests` 文件，未发现实际凭据值。
 
 ## Test Results
 | Test | Expected | Actual | Status |
@@ -36,6 +47,11 @@
 | HTTPS | 证书有效 | 用户报告有效至 2026-10-16 | ⚠️ 待复验 |
 | 开机自启 | enabled | 用户报告 enabled | ⚠️ 待复验 |
 | Live GPT-5.6 | 任意材料可分析 | API Key 未配置 | ❌ 未完成 |
+| lint（Task 5） | exit 0 | exit 0 | ✅ 通过 |
+| unit/component（Task 5） | 0 失败 | 11 files / 165 tests 通过 | ✅ 通过 |
+| E2E（Task 5） | 命令 exit 0 | 6/6 用例 `ok`，但命令 exit 124 | ⚠️ 未验证 |
+| production build（Task 5） | exit 0 | TypeScript provider 环境类型错误，exit 1 | ❌ 阻断 |
+| production audit（Task 5） | 0 known vulnerabilities | registry audit endpoint `NOT_IMPLEMENTED`，exit 1 | ⚠️ 未验证 |
 
 ## 5-Question Reboot Check
 | Question | Answer |
