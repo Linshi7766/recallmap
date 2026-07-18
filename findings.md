@@ -46,3 +46,11 @@
 - Public HTTPS returned 200 and server-rendered `AI provider: MiMo V2.5`.
 - A novel retrieval-practice lesson produced a live challenge with `fallback=false`, proving the request used MiMo rather than the exact demo fixture.
 
+## Task 4 verified deployment findings — 2026-07-18
+- Archive scan: exit 0 with no excluded secret, dependency, build, or Git artifact match.
+- Remote preflight: exit 0 (`paths-clear`). Staged `npm ci` and `npm run build`: exit 0; the build reported dynamic `/` and `/api/learn` routes. No production configuration values were read or printed.
+- Release switch: exit 0 (`deploy-ok`). One initial localhost refusal occurred during service startup, followed by a successful health probe; automatic rollback was therefore not entered. The designated remote rollback backup is intentionally retained.
+- Post-switch checks: `recall.service` was active, localhost was reachable, public HTTPS returned 200, and the rendered provider was `MiMo V2.5`.
+- Acceptance is not complete: a fresh public `generate_challenge` succeeded with HTTP 200, `ok=true`, `fallback=false`; its following `diagnose` call returned HTTP 503 during a 119.9-second bounded acceptance process. No diagnostic retry was issued. The browser repair flow is unverified because no browser was available.
+- This record intentionally omits lesson material, explanations, challenge/model output, response bodies, and credential values.
+

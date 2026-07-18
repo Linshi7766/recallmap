@@ -73,3 +73,10 @@
 - Configured one server-side `MIMO_API_KEY` entry without printing or storing the credential value in the repository.
 - Public runtime label verified as `MiMo V2.5`.
 - Live non-demo `generate_challenge` acceptance passed: `ok=true`, `fallback=false`, with a new concept, a 271-character prompt, and 3 evidence passages.
+
+## Task 4 deployment and acceptance attempt — 2026-07-18
+- **Status:** deployment and health checks passed; Task 4 acceptance is **blocked / not complete**.
+- Deployed commit `870368532fbb0634a4a0d2b0782ad539233a6740` through the prescribed tracked-only archive, isolated staged `npm ci` and production build, and automatic-rollback switch. The switch emitted `deploy-ok`; rollback was not invoked. The rollback backup remains at `/home/azureuser/recall-backup-before-timeout-20260718`.
+- Independent post-switch checks: `recall.service` active, localhost health endpoint reachable, and public HTTPS returned HTTP 200 with provider `MiMo V2.5`.
+- Novel public acceptance: `generate_challenge` returned HTTP 200 with `ok=true` and `fallback=false`; the following `diagnose` returned HTTP 503. The acceptance process took 119.9 seconds before the HTTP-error path terminated, so the required non-fallback diagnosis acceptance did not pass. No retry was made to avoid repeating a paid model call.
+- Browser repair-flow verification is unverified because this session has no available browser surface. No lesson, challenge, explanation, model output, or credential value was stored here.

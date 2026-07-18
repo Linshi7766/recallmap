@@ -75,3 +75,12 @@ Phase 3：MiMo 最终审查修复已完成本地门禁，准备服务器配置�
 - **Phase 3 status:** complete.
 - **Next phase:** complete the remaining full UI/reboot acceptance, then prepare submission assets, demo recording, and the Devpost entry.
 
+## Task 4 rollback-safe deployment — 2026-07-18
+- [x] Created a tracked-only archive and found no `.env.production`, `.env.local`, `node_modules`, `.next`, or `.git` entries.
+- [x] Preflighted clear release/backup paths; uploaded and built the staged release while production remained online.
+- [x] Ran the prescribed automatic-rollback switch; it reported `deploy-ok`. The prior release remains retained at `/home/azureuser/recall-backup-before-timeout-20260718`.
+- [x] Verified `recall.service` active, local health reachable, public HTTP 200, and provider label `MiMo V2.5`.
+- [ ] **Blocked:** novel `diagnose` acceptance returned HTTP 503 after the bounded acceptance process (119.9 seconds); do not mark timeout recovery accepted. The preceding novel `generate_challenge` was HTTP 200 with `ok=true`, `fallback=false`.
+- [ ] **Unverified:** required browser repair flow; no browser surface was available in this execution environment.
+- **Task 4 status:** blocked with production deployment retained and rollback backup preserved.
+
