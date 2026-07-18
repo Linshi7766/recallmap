@@ -54,3 +54,9 @@
 - Acceptance is not complete: a fresh public `generate_challenge` succeeded with HTTP 200, `ok=true`, `fallback=false`; its following `diagnose` call returned HTTP 503 during a 119.9-second bounded acceptance process. No diagnostic retry was issued. The browser repair flow is unverified because no browser was available.
 - This record intentionally omits lesson material, explanations, challenge/model output, response bodies, and credential values.
 
+## Final MiMo no-reasoning trial — 2026-07-18
+- **Status:** controlled HTTP acceptance passed on release `2fde678`.
+- The controlled `generate` request returned HTTP 200 in 4.157 seconds. The controlled `diagnose` request returned HTTP 200 in 11.803 seconds with `fallback=false`, three valid reasoning nodes, and a probe.
+- The prior Task 4 diagnose HTTP 503/119.9-second result is preserved above as historical evidence and is **superseded** by this final no-reasoning trial; it is not the latest acceptance status.
+- Browser UI repair-flow verification remains **unverified**. This result covers the controlled HTTP acceptance only.
+

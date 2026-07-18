@@ -4,7 +4,7 @@
 让 Recall 的公网演示达到可供黑客松评委稳定访问、透明体验已选 live AI provider 主流程并可提交的状态。
 
 ## Current Phase
-Phase 3：MiMo 最终审查修复已完成本地门禁，准备服务器配置与 live non-demo 验收
+Phase 3：MiMo no-reasoning 受控 HTTP 验收已在 release `2fde678` 通过；browser UI repair-flow 仍未验证
 
 ## Phases
 
@@ -80,7 +80,13 @@ Phase 3：MiMo 最终审查修复已完成本地门禁，准备服务器配置�
 - [x] Preflighted clear release/backup paths; uploaded and built the staged release while production remained online.
 - [x] Ran the prescribed automatic-rollback switch; it reported `deploy-ok`. The prior release remains retained at `/home/azureuser/recall-backup-before-timeout-20260718`.
 - [x] Verified `recall.service` active, local health reachable, public HTTP 200, and provider label `MiMo V2.5`.
-- [ ] **Blocked:** novel `diagnose` acceptance returned HTTP 503 after the bounded acceptance process (119.9 seconds); do not mark timeout recovery accepted. The preceding novel `generate_challenge` was HTTP 200 with `ok=true`, `fallback=false`.
+- [x] **Superseded historical result:** novel `diagnose` acceptance returned HTTP 503 after the bounded acceptance process (119.9 seconds). The preceding novel `generate_challenge` was HTTP 200 with `ok=true`, `fallback=false`. This history is retained and superseded by the final no-reasoning controlled acceptance below.
 - [ ] **Unverified:** required browser repair flow; no browser surface was available in this execution environment.
-- **Task 4 status:** blocked with production deployment retained and rollback backup preserved.
+- **Task 4 status:** historical record superseded; current controlled HTTP acceptance is passed, while browser UI repair-flow verification remains unverified.
+
+## Final MiMo no-reasoning controlled acceptance — 2026-07-18
+- [x] Release `2fde678` completed the controlled HTTP `generate` request with HTTP 200 in 4.157 seconds.
+- [x] The controlled HTTP `diagnose` request completed with HTTP 200 in 11.803 seconds, `fallback=false`, three valid reasoning nodes, and a probe.
+- [x] Controlled HTTP acceptance passed; the current tracker state is not blocked.
+- [ ] Browser UI repair-flow verification is unverified and is not claimed by this acceptance.
 

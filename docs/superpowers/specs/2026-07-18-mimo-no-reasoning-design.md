@@ -1,6 +1,6 @@
 # MiMo No-Reasoning Trial Design
 
-**Date:** 2026-07-18  
+**Date:** 2026-07-18
 **Status:** Approved for implementation planning
 
 ## Context

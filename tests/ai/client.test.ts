@@ -62,6 +62,7 @@ it("returns parsed structured output with the required Responses payload", async
     name: "test",
     strict: true,
   });
+  expect(parse.mock.calls[0]?.[0]).not.toHaveProperty("max_output_tokens");
 });
 
 it("retries exactly once after schema-invalid output", async () => {
