@@ -28,9 +28,9 @@ The final screen makes the conceptual change inspectable through a Before/After 
 
 5. Select **Check my repaired understanding** to see the repaired reasoning map and Before/After result.
 
-The primary implementation calls `gpt-5.6` through the OpenAI Responses API when `OPENAI_API_KEY` is configured. This is the competition path: four server-side model operations generate the open teachback prompt, diagnose three to five reasoning nodes, generate one targeted probe, and compare the original and revised explanations. Every model response uses strict structured outputs parsed into Zod contracts; evidence excerpts are additionally checked against the normalized source text before display.
-
 ## How GPT-5.6 is used
+
+The primary implementation calls `gpt-5.6` through the OpenAI Responses API when `OPENAI_API_KEY` is configured. This is the competition path: four server-side model operations generate the open teachback prompt, diagnose three to five reasoning nodes, generate one targeted probe, and compare the original and revised explanations. Every model response uses strict structured outputs parsed into Zod contracts; evidence excerpts are additionally checked against the normalized source text before display.
 
 When OpenAI credentials are unavailable and `MIMO_API_KEY` is configured, the hosted application uses Xiaomi `mimo-v2.5` through its OpenAI-compatible Responses API. The interface identifies this provider as MiMo V2.5; MiMo output is never represented as GPT-5.6 output. OpenAI takes priority if both keys are configured.
 
@@ -42,7 +42,7 @@ The exact scripted path described above remains the only answer path eligible fo
 
 Codex researched the product and API constraints, turned the design into an implementation plan, implemented the Next.js application and its typed boundaries, and built the unit, component, route, and browser test coverage. Codex also exercised failure recovery and responsive behavior during development.
 
-Codex is not a tutor running inside Recall. GPT-5.6 performs the live source-grounded learning analysis at runtime; Codex was the development tool used to research, plan, implement, and test the project.
+Codex is not a tutor running inside Recall. The selected live provider performs the source-grounded learning analysis at runtime; Codex was the development tool used to research, plan, implement, and test the project.
 
 ## Architecture
 
@@ -50,13 +50,13 @@ Codex is not a tutor running inside Recall. GPT-5.6 performs the live source-gro
 Browser Guided UI
   ├─ localStorage: recoverable active session and student progress
   └─ POST /api/learn: source, explanations, and typed prior-stage data
-       └─ server-only GPT-5.6 gateway
-            ├─ OpenAI Responses API structured outputs
+       └─ server-only selected live provider gateway
+            ├─ selected-provider Responses API structured outputs
             ├─ Zod contract validation
             └─ exact source-evidence verification
 ```
 
-The browser follows five internal states (`start`, `teachback`, `diagnosis`, `repair`, and `result`) presented as four visible learning steps. The single Next.js route validates three request operations and dispatches four focused GPT-5.6 calls. There is no authentication and no server database.
+The browser follows five internal states (`start`, `teachback`, `diagnosis`, `repair`, and `result`) presented as four visible learning steps. The single Next.js route validates three request operations and dispatches four focused selected-provider calls. There is no authentication and no server database.
 
 ## Local setup
 
@@ -98,11 +98,11 @@ npm run build
 npm audit --omit=dev
 ```
 
-The E2E suite intercepts `/api/learn` and uses exported, contract-validated fixtures. It never calls the real OpenAI API or depends on network responses.
+The E2E suite intercepts `/api/learn` and uses exported, contract-validated fixtures. It never calls a real provider API or depends on network responses.
 
 ## Demo fallback disclosure
 
-Recall attempts live `gpt-5.6` first. A fallback is considered only when that live operation ends in an eligible availability failure or invalid structured output. It then matches the complete request against the built-in correlation-and-causation source and the exact scripted challenge, first explanation, diagnosis/probe, and revision exported by the application. A matching response is returned with `fallback: true`.
+Recall attempts the selected live provider first. A fallback is considered only when that live provider operation ends in an eligible availability failure or invalid structured output. It then matches the complete request against the built-in correlation-and-causation source and the exact scripted challenge, first explanation, diagnosis/probe, and revision exported by the application. A matching response is returned with `fallback: true`.
 
 The fallback is never used after a model refusal, for modified demo inputs, or for arbitrary pasted material. Pasted material always requires live analysis and receives an explicit error if the live model cannot complete the operation.
 

@@ -27,3 +27,16 @@ it("documents both server-only provider keys without values", () => {
   expect(readme).toContain("OpenAI takes priority when both keys are set");
   expect(readme).not.toMatch(/(?:OPENAI|MIMO)_API_KEY=\S+/);
 });
+
+it("describes generic live analysis through the selected provider", () => {
+  const readme = readFileSync("README.md", "utf8");
+
+  expect(readme).toContain("server-only selected live provider gateway");
+  expect(readme).toContain("dispatches four focused selected-provider calls");
+  expect(readme).toContain("Recall attempts the selected live provider first");
+  expect(readme).toContain("never calls a real provider API");
+  expect(readme).not.toContain("server-only GPT-5.6 gateway");
+  expect(readme).not.toContain("dispatches four focused GPT-5.6 calls");
+  expect(readme).not.toContain("Recall attempts live `gpt-5.6` first");
+  expect(readme).not.toContain("never calls the real OpenAI API");
+});
