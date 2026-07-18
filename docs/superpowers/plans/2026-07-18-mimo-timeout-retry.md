@@ -311,3 +311,15 @@ git commit -m "docs: verify MiMo timeout recovery"
 - [ ] **Step 9: Clean generated archive**
 
 Resolve `D:\UniFiles\ProjectRecall\recall-mimo-timeout-20260718.tar.gz`, verify it is inside the workspace, and delete only that file. Retain the remote rollback backup until the Devpost demo is recorded.
+
+## 2026-07-18 MiMo output-budget deployment evidence
+
+- Release commit: `43f4cbbb39dfb4bc457b53730971696fe0156353`.
+- Archive: tracked-only `recall-mimo-budget-20260718.tar.gz`; the exclusion scan found no `node_modules`, `.next`, `.env`, or `.git` entries. The local and uploaded archive SHA-256 values matched.
+- Preflight: `/home/azureuser` had 54 GiB free; memory reported 315 MiB available with 1.3 GiB swap free. `recall.service` was active and enabled. `/home/azureuser/recall` was mode `700`; `.env.production` was mode `600`; both were owned by `azureuser:azureuser`. Only the environment variable name `MIMO_API_KEY` was observed.
+- Staging: `.env.production` remained mode `600`; `npm ci` completed, reporting two moderate audit findings, and `npm run build` completed with the `/` and `/api/learn` dynamic routes.
+- Release switch: succeeded without rollback. `recall.service` was active and enabled; local HTTP was `200`; public HTTP was `200`; the public provider label was `MiMo V2.5`. Recent startup logs showed Next.js ready in 153 ms, with no observed startup error or credential output.
+- Exactly one live flow was attempted. Generate returned HTTP `200`, `ok=true`, `fallback=false` in 49.552 s. Diagnose returned HTTP `503` in 45.906 s; no success envelope was available, so no fallback value was observed, node count was `0`, and no probe was present. Total elapsed time was 95.484 s.
+- Per the acceptance stop rule, no second paid call was made and no timeout or token setting was changed. The required non-fallback diagnosis result was not achieved.
+- Browser flow: not run after the HTTP `503`, because it would have triggered another paid generate/diagnose flow contrary to the stop rule. User-visible diagnosis rendering remains unverified.
+- Remote rollback backups observed and retained: `/home/azureuser/recall-backup-before-timeout-20260718` and `/home/azureuser/recall-backup-before-budget-20260718`.
