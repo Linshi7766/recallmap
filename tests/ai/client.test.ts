@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 it("uses a longer request timeout only for MiMo", () => {
-  expect(getProviderTimeoutMs("mimo")).toBe(45_000);
+  expect(getProviderTimeoutMs("mimo")).toBe(75_000);
   expect(getProviderTimeoutMs("openai")).toBe(25_000);
 });
 
@@ -412,7 +412,7 @@ it("redacts an unavailable SDK failure while retaining the final cause", async (
   expect(parse).toHaveBeenCalledTimes(2);
 });
 
-it("uses bounded low reasoning for MiMo JSON object output", async () => {
+it("uses no reasoning with a bounded MiMo JSON object output", async () => {
   vi.stubEnv("OPENAI_API_KEY", "");
   vi.stubEnv("MIMO_API_KEY", "test-mimo-key");
   const create = vi.fn().mockResolvedValue({
@@ -434,8 +434,8 @@ it("uses bounded low reasoning for MiMo JSON object output", async () => {
   const expectedJsonSchema = JSON.stringify(z.toJSONSchema(Output));
   expect(request).toMatchObject({
     model: "mimo-v2.5",
-    reasoning: { effort: "low" },
-    max_output_tokens: 4_096,
+    reasoning: { effort: "none" },
+    max_output_tokens: 2_048,
     instructions: expect.any(String),
     input: options.input,
     text: { format: { type: "json_object" } },

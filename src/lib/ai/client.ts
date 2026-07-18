@@ -52,8 +52,8 @@ let clientProviderId: AiProviderId | undefined;
 
 export function getProviderTimeoutMs(
   providerId: AiProviderId,
-): 25_000 | 45_000 {
-  return providerId === "mimo" ? 45_000 : 25_000;
+): 25_000 | 75_000 {
+  return providerId === "mimo" ? 75_000 : 25_000;
 }
 
 function getClient(provider: AiProviderConfig): OpenAI {
@@ -125,8 +125,8 @@ function mimoStructuredRequest<T>(
 
   return {
     model: provider.model,
-    reasoning: { effort: "low" },
-    max_output_tokens: 4_096,
+    reasoning: { effort: "none" },
+    max_output_tokens: 2_048,
     instructions: [
       options.instructions,
       "Return exactly one JSON object and no surrounding text.",
