@@ -1,16 +1,16 @@
 # Recall 收尾计划
 
 ## Goal
-让 Recall 的公网演示达到可供黑客松评委稳定访问、完整体验 GPT-5.6 主流程并可提交的状态。
+让 Recall 的公网演示达到可供黑客松评委稳定访问、透明体验已选 live AI provider 主流程并可提交的状态。
 
 ## Current Phase
-Phase 3：修复本地 MiMo 集成构建门禁，并准备生产环境凭据
+Phase 3：本地 MiMo 验证完成，准备服务器配置与 live non-demo 验收
 
 ## Phases
 
 ### Phase 1：产品开发
 - [x] 完成 Recall Next.js 应用与 README
-- [x] 通过 lint、单元/组件测试、E2E 和 production build
+- [x] 通过 lint、单元/组件测试、E2E 和 production build（这是 `f664d1e` 时期的原始产品基线；MiMo 集成后的新鲜验证单独记录在 Phase 3）
 - **Status:** complete
 
 ### Phase 2：Azure 部署
@@ -20,11 +20,12 @@ Phase 3：修复本地 MiMo 集成构建门禁，并准备生产环境凭据
 
 ### Phase 3：启用完整 AI 主流程
 - [x] 完成本地 MiMo provider 代码集成：仅当未配置 OpenAI 时选择 `mimo-v2.5`；两者同时存在时 OpenAI 优先。
-- [ ] 修复 `npm run build` 的 TypeScript 阻断（`src/lib/ai/provider.ts:22` 中 `process.env` 与 `ProviderEnvironment` 不兼容），并重新运行完整本地门禁。
-- [ ] 在服务器安全设置 `MIMO_API_KEY`（或继续使用 `OPENAI_API_KEY`）；不得把任何密钥写入仓库、命令参数、截图或聊天记录。
+- [x] 以 `dc163c4` 修复 `process.env` 类型兼容，并在当前 HEAD 新鲜通过 lint、165 项 Vitest、6 项 Playwright E2E 和 production build。
+- [x] 使用官方 npm registry 完成生产依赖审计；确认 2 个 moderate（Next → PostCSS）且 `No fix available`，保留为已知上游风险，不修改依赖。
+- [ ] 在服务器安全设置 `MIMO_API_KEY`；不得把任何密钥写入仓库、命令参数、截图或聊天记录。
 - [ ] 取得准确的 systemd unit 名称，使用 root 可读环境文件和 drop-in 注入密钥后重启该服务。
 - [ ] 通过 https://recall-app.duckdns.org 验证任意非内置示例材料走 live MiMo；不得将 fallback 视为 live 验收。
-- **Status:** blocked（2026-07-18 本地 build 失败；服务器配置和 live MiMo 验收均未执行）
+- **Status:** in_progress（本地验证完成；服务器配置和 live MiMo 验收均未执行）
 
 ### Phase 4：公网验收
 - [ ] 检查 https://recall-app.duckdns.org 可访问且证书有效
@@ -41,8 +42,8 @@ Phase 3：修复本地 MiMo 集成构建门禁，并准备生产环境凭据
 - **Status:** pending
 
 ## Key Questions
-1. 生产环境的 `MIMO_API_KEY`（或 `OPENAI_API_KEY`）何时安全配置？
-2. 准确的 systemd unit 名称是什么，以便安全地创建 drop-in 并重启正确服务？
+1. 准确的 systemd unit 名称是什么，以便安全地创建 drop-in 并重启正确服务？
+2. 生产环境的 `MIMO_API_KEY` 何时通过 root 可读环境文件安全配置？
 3. 公网 live MiMo 主流程是否已经通过非内置材料完整跑通？
 4. Demo 视频、代码仓库和 Devpost 提交材料是否已经完成？
 
@@ -58,4 +59,7 @@ Phase 3：修复本地 MiMo 集成构建门禁，并准备生产环境凭据
 |-------|---------|------------|
 | 初次 SSH 返回 `Permission denied (publickey)` | 1 | 后续已完成 SSH 密钥配置 |
 | 当前网络不稳定，原会话无法继续部署 | 1 | 将 Azure 部署交接给其他 agent，现已完成基础部署 |
+| MiMo 初次 production build 在 `provider.ts:22` 类型检查失败 | 1 | `dc163c4` 修复环境对象结构类型；当前 HEAD build exit 0 |
+| 沙箱内 Playwright 6 项用例结束后无法回收 Windows webServer | 1 | 获批非沙箱运行自然退出，6/6 通过；未将沙箱超时视为项目失败 |
+| 默认镜像不实现 npm audit endpoint | 1 | 改用官方 registry 验证：2 moderate，No fix available |
 
