@@ -114,7 +114,7 @@ Recoverable progress is stored in the current browser's `localStorage`; clearing
 
 The study material, prompt context, original and revised explanations, and relevant prior-stage analysis are sent through the server to the selected live provider: OpenAI when configured, otherwise Xiaomi MiMo. Provider credentials remain server-side. Review the applicable provider terms before submitting sensitive material; Xiaomi's compatibility documentation is available at <https://mimo.mi.com/docs/en-US/api/chat/responses>.
 
-Study material is treated as untrusted reference data and delimited from instructions. Evidence checks reduce fabricated quotations, but model-generated diagnoses can still be incomplete or wrong. Recall is an educational aid, not a grading authority or a medical, psychological, or permanent assessment. Users should compare important conclusions with the original source. The MVP accepts the built-in lesson or pasted text only, has no PDF import, and keeps progress only in one browser.
+Study material is treated as untrusted reference data and delimited from instructions. Evidence checks reduce fabricated quotations, but model-generated diagnoses can still be incomplete or wrong. RecallMap is an educational aid, not a grading authority or a medical, psychological, or permanent assessment. Users should compare important conclusions with the original source. The MVP accepts the built-in lesson or pasted text only, has no PDF import, and keeps progress only in one browser.
 
 ## License
 

@@ -34,10 +34,12 @@ it("describes generic live analysis through the selected provider", () => {
   expect(readme).toContain("server-only selected live provider gateway");
   expect(readme).toContain("dispatches four focused selected-provider calls");
   expect(readme).toContain("RecallMap attempts the selected live provider first");
+  expect(readme).toContain("RecallMap is an educational aid");
   expect(readme).toContain("never calls a real provider API");
   expect(readme).not.toContain("server-only GPT-5.6 gateway");
   expect(readme).not.toContain("dispatches four focused GPT-5.6 calls");
   expect(readme).not.toContain("RecallMap attempts live `gpt-5.6` first");
+  expect(readme).not.toContain("Recall is an educational aid");
   expect(readme).not.toContain("never calls the real OpenAI API");
 });
 
