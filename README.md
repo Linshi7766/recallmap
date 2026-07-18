@@ -28,13 +28,15 @@ The final screen makes the conceptual change inspectable through a Before/After 
 
 5. Select **Check my repaired understanding** to see the repaired reasoning map and Before/After result.
 
-Normal requests use live `gpt-5.6`. The exact scripted path above is also the only answer path eligible for the disclosed demo fallback described below.
+The primary implementation calls `gpt-5.6` through the OpenAI Responses API when `OPENAI_API_KEY` is configured. This is the competition path: four server-side model operations generate the open teachback prompt, diagnose three to five reasoning nodes, generate one targeted probe, and compare the original and revised explanations. Every model response uses strict structured outputs parsed into Zod contracts; evidence excerpts are additionally checked against the normalized source text before display.
 
 ## How GPT-5.6 is used
 
-At runtime, server-side code calls `gpt-5.6` through the OpenAI Responses API. Four model operations generate the open teachback prompt, diagnose three to five reasoning nodes, generate one targeted probe, and compare the original and revised explanations. Every model response uses strict structured outputs parsed into Zod contracts; evidence excerpts are additionally checked against the normalized source text before display.
+When OpenAI credentials are unavailable and `MIMO_API_KEY` is configured, the hosted application uses Xiaomi `mimo-v2.5` through its OpenAI-compatible Responses API. The interface identifies this provider as MiMo V2.5; MiMo output is never represented as GPT-5.6 output. OpenAI takes priority if both keys are configured.
 
-The request uses medium reasoning effort, `store: false`, a privacy-preserving session UUID as `safety_identifier`, and a server-only API key. Model refusals and invalid or unavailable responses are handled as typed failures rather than being displayed as invented learning feedback.
+Every live request uses medium reasoning and a server-only credential. OpenAI requests additionally use `store: false` and a privacy-preserving session UUID as `safety_identifier`. Model refusals and invalid or unavailable responses are handled as typed failures rather than being displayed as invented learning feedback.
+
+The exact scripted path described above remains the only answer path eligible for the disclosed built-in demo fallback. The fallback is considered only after an eligible live availability failure or invalid structured output.
 
 ## How Codex accelerated the build
 
@@ -58,12 +60,12 @@ The browser follows five internal states (`start`, `teachback`, `diagnosis`, `re
 
 ## Local setup
 
-Requirements: Node.js 20.19 or newer and an OpenAI API key.
+Requirements: Node.js 20.19 or newer and at least one supported server-side model key.
 
 ```powershell
 npm ci
 Copy-Item .env.example .env.local
-# Set OPENAI_API_KEY in .env.local
+# Set OPENAI_API_KEY or MIMO_API_KEY in .env.local
 npm run dev
 ```
 
@@ -71,9 +73,12 @@ Open `http://127.0.0.1:3000`.
 
 ## Environment variables
 
-`OPENAI_API_KEY` is required for live analysis. It is read only by server-side code and must never use a `NEXT_PUBLIC_` prefix. `.env.local` is ignored by Git.
+- `OPENAI_API_KEY` selects `gpt-5.6`.
+- If OpenAI is not configured, `MIMO_API_KEY` selects `mimo-v2.5` through Xiaomi's OpenAI-compatible Responses API.
+- OpenAI takes priority when both keys are set.
+- With neither key, only the disclosed exact built-in demo fallback can run.
 
-No other environment variable is required. The client generates a random UUID with `crypto.randomUUID()` for each learning session and sends it as the OpenAI safety identifier. That UUID is not an account ID, authentication credential, email address, or name.
+Both variables are server-only and must never use a `NEXT_PUBLIC_` prefix. `.env.local` is ignored by Git. Never commit either key.
 
 ## Test commands
 
@@ -103,7 +108,9 @@ The fallback is never used after a model refusal, for modified demo inputs, or f
 
 ## Privacy and limitations
 
-Recoverable progress is stored in the current browser's `localStorage`; clearing site data removes it. Recall has no server database and does not create learner accounts. The study material, prompt context, original and revised explanations, and relevant prior-stage analysis are sent through the server to OpenAI for the requested analysis. The API key remains server-side, and Responses API requests set `store: false`.
+Recoverable progress is stored in the current browser's `localStorage`; clearing site data removes it. Recall has no server database and does not create learner accounts.
+
+The study material, prompt context, original and revised explanations, and relevant prior-stage analysis are sent through the server to the selected live provider: OpenAI when configured, otherwise Xiaomi MiMo. Provider credentials remain server-side. Review the applicable provider terms before submitting sensitive material; Xiaomi's compatibility documentation is available at <https://mimo.mi.com/docs/en-US/api/chat/responses>.
 
 Study material is treated as untrusted reference data and delimited from instructions. Evidence checks reduce fabricated quotations, but model-generated diagnoses can still be incomplete or wrong. Recall is an educational aid, not a grading authority or a medical, psychological, or permanent assessment. Users should compare important conclusions with the original source. The MVP accepts the built-in lesson or pasted text only, has no PDF import, and keeps progress only in one browser.
 

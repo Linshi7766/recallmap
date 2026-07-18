@@ -17,3 +17,13 @@ it("keeps isolated worktrees out of repository-wide lint", () => {
 
   expect(eslintConfig).toContain('".worktrees/**"');
 });
+
+it("documents both server-only provider keys without values", () => {
+  const example = readFileSync(".env.example", "utf8").replace(/\r\n/g, "\n");
+  const readme = readFileSync("README.md", "utf8");
+
+  expect(example).toBe("OPENAI_API_KEY=\nMIMO_API_KEY=\n");
+  expect(readme).toContain("mimo-v2.5");
+  expect(readme).toContain("OpenAI takes priority when both keys are set");
+  expect(readme).not.toMatch(/(?:OPENAI|MIMO)_API_KEY=\S+/);
+});
