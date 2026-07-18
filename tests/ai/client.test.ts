@@ -412,7 +412,7 @@ it("redacts an unavailable SDK failure while retaining the final cause", async (
   expect(parse).toHaveBeenCalledTimes(2);
 });
 
-it("uses MiMo JSON object mode and validates raw output text", async () => {
+it("uses bounded low reasoning for MiMo JSON object output", async () => {
   vi.stubEnv("OPENAI_API_KEY", "");
   vi.stubEnv("MIMO_API_KEY", "test-mimo-key");
   const create = vi.fn().mockResolvedValue({
@@ -431,16 +431,11 @@ it("uses MiMo JSON object mode and validates raw output text", async () => {
   expect(create).toHaveBeenCalledTimes(1);
   expect(validate).toHaveBeenCalledWith({ value: "ok" });
   const request = create.mock.calls[0]?.[0];
-  const expectedJsonSchema = JSON.stringify(z.toJSONSchema(Output));
   expect(request).toMatchObject({
     model: "mimo-v2.5",
-    reasoning: { effort: "medium" },
-    instructions: [
-      options.instructions,
-      "Return exactly one JSON object and no surrounding text.",
-      "The JSON object must match this exact JSON Schema:",
-      expectedJsonSchema,
-    ].join("\n\n"),
+    reasoning: { effort: "low" },
+    max_output_tokens: 4_096,
+    instructions: expect.any(String),
     input: options.input,
     text: { format: { type: "json_object" } },
   });

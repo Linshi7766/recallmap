@@ -125,7 +125,8 @@ function mimoStructuredRequest<T>(
 
   return {
     model: provider.model,
-    reasoning: { effort: "medium" },
+    reasoning: { effort: "low" },
+    max_output_tokens: 4_096,
     instructions: [
       options.instructions,
       "Return exactly one JSON object and no surrounding text.",
