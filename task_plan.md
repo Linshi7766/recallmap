@@ -24,10 +24,10 @@ Phase 3：MiMo 最终审查修复已完成本地门禁，准备服务器配置�
 - [x] 首页强制动态渲染；新鲜 production build 路由表显示 `ƒ /`，运行时环境决定 provider label。
 - [x] 在当前 HEAD 新鲜通过 lint、169 项 Vitest、6 项获批非沙箱 Playwright E2E 和 production build。
 - [x] 使用官方 npm registry 完成生产依赖审计；确认 2 个 moderate（Next → PostCSS）且 `No fix available`，保留为已知上游风险，不修改依赖。
-- [ ] 在服务器安全设置 `MIMO_API_KEY`；不得把任何密钥写入仓库、命令参数、截图或聊天记录。
-- [ ] 取得准确的 systemd unit 名称，使用 root 可读环境文件和 drop-in 注入密钥后重启该服务。
-- [ ] 通过 https://recall-app.duckdns.org 验证任意非内置示例材料走 live MiMo；不得将 fallback 视为 live 验收。
-- **Status:** in_progress（本地验证完成；服务器配置和 live MiMo 验收均未执行）
+- [x] 在服务器安全设置 `MIMO_API_KEY`；密钥值未写入仓库、命令参数、截图或聊天记录。
+- [x] 确认 systemd unit 为 `recall.service`，通过权限为 `0600` 的 `.env.production` 注入密钥并重启服务。
+- [x] 通过 https://recall-app.duckdns.org 验证任意非内置示例材料走 live MiMo；响应为 `fallback=false`。
+- **Status:** complete
 
 ### Phase 4：公网验收
 - [ ] 检查 https://recall-app.duckdns.org 可访问且证书有效
@@ -65,4 +65,13 @@ Phase 3：MiMo 最终审查修复已完成本地门禁，准备服务器配置�
 | 沙箱内 Playwright 6 项用例结束后无法回收 Windows webServer | 1 | 获批非沙箱运行自然退出，6/6 通过；未将沙箱超时视为项目失败 |
 | 默认镜像不实现 npm audit endpoint | 1 | 改用官方 registry 验证：2 moderate，No fix available |
 | final-fix 首次 build 在 `client.ts` 拒绝 raw response 类型 | 1 | 将 refusal helper 参数收窄为它实际读取的可选 `output`；重跑 build exit 0 且首页为 dynamic |
+
+## Production completion update — 2026-07-18
+- [x] Identified the exact systemd unit: `recall.service`.
+- [x] Deployed commit `1d502cb` with a staged production build and health-checked directory switch.
+- [x] Configured `MIMO_API_KEY` only in `/home/azureuser/recall/.env.production` without exposing the credential value.
+- [x] Verified https://recall-app.duckdns.org returns HTTP 200 and displays `MiMo V2.5`.
+- [x] Verified a novel, non-demo request returns `ok=true` and `fallback=false`.
+- **Phase 3 status:** complete.
+- **Next phase:** complete the remaining full UI/reboot acceptance, then prepare submission assets, demo recording, and the Devpost entry.
 

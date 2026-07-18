@@ -64,4 +64,12 @@
 | Where am I going? | 先确认 systemd unit、配置服务器 `MIMO_API_KEY`，再做 live non-demo 公网验收 |
 | What's the goal? | 给评委提供稳定、透明标注 provider 的真实学习体验，而非仅依赖 fallback |
 | What have I learned? | 本地 runtime 已通过全部功能门禁；仍有 2 个无可用修复的 moderate 上游漏洞，且服务器凭据、服务重启和真实 MiMo Responses 兼容性均未验证 |
-| What have I done? | 完成 MiMo 集成与 `5885fbe` 最终兼容修复、当前 HEAD 全套本地门禁与官方 audit；未连接 Azure |
+| What have I done? | 完成 MiMo 集成、全套本地门禁、Azure 部署与 live non-demo 公网验收 |
+
+## Production MiMo verification — 2026-07-18
+- **Status:** complete
+- Deployed commit `1d502cb` to `/home/azureuser/recall`; previous release retained at `/home/azureuser/recall-backup-before-mimo-1d502cb`.
+- Confirmed `recall.service` is active and the public HTTPS homepage returns HTTP 200.
+- Configured one server-side `MIMO_API_KEY` entry without printing or storing the credential value in the repository.
+- Public runtime label verified as `MiMo V2.5`.
+- Live non-demo `generate_challenge` acceptance passed: `ok=true`, `fallback=false`, with a new concept, a 271-character prompt, and 3 evidence passages.

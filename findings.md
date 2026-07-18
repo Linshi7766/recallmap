@@ -39,3 +39,10 @@
 - 公网入口：https://recall-app.duckdns.org
 - 历史交接：`D:\UniFiles\ProjectRecall\进度管理\Recall-进度交接.md`
 
+## Verified production findings — 2026-07-18
+- Azure service identity is `recall.service`, running as `azureuser` from `/home/azureuser/recall`.
+- The production environment file is `/home/azureuser/recall/.env.production`; only variable names and non-secret metadata were inspected.
+- Commit `1d502cb` built successfully on the VM and was switched into production with the prior release retained for rollback.
+- Public HTTPS returned 200 and server-rendered `AI provider: MiMo V2.5`.
+- A novel retrieval-practice lesson produced a live challenge with `fallback=false`, proving the request used MiMo rather than the exact demo fixture.
+
