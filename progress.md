@@ -26,17 +26,20 @@
 ### Phase 3：完整 AI 主流程
 - **Status:** in_progress
 - 本地 MiMo provider 代码集成已提交：`OPENAI_API_KEY` 存在时 GPT-5.6 优先；否则 `MIMO_API_KEY` 选择 MiMo V2.5。
-- `dc163c4` 已修复 `process.env` 类型兼容；当前 HEAD 的 lint、165 项 Vitest、production build 和 6 项 E2E 已新鲜通过。
+- `5885fbe` 已修复 MiMo JSON object/raw output path 与首页 runtime provider label；当前 HEAD 的 lint、169 项 Vitest、dynamic production build 和 6 项获批非沙箱 E2E 已新鲜通过。
 - 官方 npm audit 已验证 2 个 moderate（Next → PostCSS），`No fix available`；保留为已知上游风险且未改动依赖。
 - 服务器 `MIMO_API_KEY` 仍 pending；本会话未连接或修改 Azure。需先确认精确的 systemd unit 名称，再通过 root 可读环境文件和 systemd drop-in 安全注入密钥。
 - live non-demo MiMo 验收仍 pending；不得将内置 fallback 或自动化 mock 视为生产验证。
 
-### Task 5：本地门禁与范围检查（2026-07-18）
-- **Status:** local verification complete；server handoff pending
+### Task 5：最终审查修复与门禁（2026-07-18）
+- **Status:** final-fix local verification complete；server handoff pending
+- RED（核心）：`npx vitest run tests/ai/client.test.ts tests/components/recall-app.test.tsx` exit 1，4 failed / 61 passed；失败精确命中 MiMo 仍走 `responses.parse` 的 3 项行为和缺失 `dynamic` export。首次实现后再跑为 exit 1，2 failed / 63 passed，定位 malformed JSON 尚未进入 repair retry。
+- GREEN（核心）：同一命令 exit 0，2 files / 65 tests；README hygiene 先 RED（exit 1，1 failed / 4 passed），再 GREEN（exit 0，5/5）。
+- focused AI/client/provider：exit 0，3 files / 57 tests；focused component/hygiene：exit 0，2 files / 46 tests。
 - `npm run lint`：exit 0，ESLint 无报告错误。
-- `npm test`：exit 0，Vitest 11 个测试文件、165 项测试通过、0 失败。
-- `npm run build`：exit 0；Next production build、TypeScript 和 4/4 静态页生成完成。
-- `npm run test:e2e`：获批非沙箱运行 exit 0，6/6 Playwright Chromium 用例通过并自然退出。先前沙箱 exit 124 已定位为 Windows webServer 回收权限问题，不作为项目失败。
+- `npm test`：exit 0，Vitest 11 个测试文件、169 项测试通过、0 失败。
+- `npm run build`：首次 exit 1（raw response refusal helper 类型过窄）；最小修复后 exit 0，路由表明确首页 `ƒ /` 为 dynamic。
+- `npm run test:e2e`：获批非沙箱运行 exit 0，6/6 Playwright Chromium 用例通过并自然退出。
 - `npm audit --omit=dev --registry=https://registry.npmjs.org`：exit 1；官方 registry 验证 2 moderate（Next → PostCSS）且 `No fix available`。审计已验证，但风险仍未解决。
 - 完整范围 `f543c5e..HEAD` 明确包含 `.env.example`、README、三份进度文档、5 个 `src` 文件和 5 个 `tests` 文件；完整逐文件列表见 `findings.md`。`git diff --check f543c5e..HEAD` exit 0；未发现真实凭据值。
 
@@ -49,9 +52,9 @@
 | 开机自启 | enabled | 用户报告 enabled | ⚠️ 待复验 |
 | Live MiMo | 任意非内置材料可分析 | 服务器 `MIMO_API_KEY`、准确 unit 和公网验收均 pending | ❌ 未完成 |
 | lint（Task 5） | exit 0 | exit 0 | ✅ 通过 |
-| unit/component（Task 5） | 0 失败 | 11 files / 165 tests 通过 | ✅ 通过 |
+| unit/component（Task 5） | 0 失败 | 11 files / 169 tests 通过 | ✅ 通过 |
 | E2E（Task 5） | 命令 exit 0 | 6/6 passed，自然退出 0 | ✅ 通过 |
-| production build（Task 5） | exit 0 | TypeScript 与 4/4 静态页完成，exit 0 | ✅ 通过 |
+| production build（Task 5） | exit 0，首页 dynamic | `ƒ /`，exit 0 | ✅ 通过 |
 | production audit（Task 5） | 记录官方结果 | 2 moderate，No fix available，exit 1 | ⚠️ 已验证上游风险 |
 
 ## 5-Question Reboot Check
@@ -61,4 +64,4 @@
 | Where am I going? | 先确认 systemd unit、配置服务器 `MIMO_API_KEY`，再做 live non-demo 公网验收 |
 | What's the goal? | 给评委提供稳定、透明标注 provider 的真实学习体验，而非仅依赖 fallback |
 | What have I learned? | 本地 runtime 已通过全部功能门禁；仍有 2 个无可用修复的 moderate 上游漏洞，且服务器凭据、服务重启和真实 MiMo Responses 兼容性均未验证 |
-| What have I done? | 完成 MiMo 集成、`dc163c4` runtime 类型修复、当前 HEAD 全套本地门禁与官方 audit；未连接 Azure |
+| What have I done? | 完成 MiMo 集成与 `5885fbe` 最终兼容修复、当前 HEAD 全套本地门禁与官方 audit；未连接 Azure |

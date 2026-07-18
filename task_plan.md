@@ -4,7 +4,7 @@
 让 Recall 的公网演示达到可供黑客松评委稳定访问、透明体验已选 live AI provider 主流程并可提交的状态。
 
 ## Current Phase
-Phase 3：本地 MiMo 验证完成，准备服务器配置与 live non-demo 验收
+Phase 3：MiMo 最终审查修复已完成本地门禁，准备服务器配置与 live non-demo 验收
 
 ## Phases
 
@@ -20,7 +20,9 @@ Phase 3：本地 MiMo 验证完成，准备服务器配置与 live non-demo 验�
 
 ### Phase 3：启用完整 AI 主流程
 - [x] 完成本地 MiMo provider 代码集成：仅当未配置 OpenAI 时选择 `mimo-v2.5`；两者同时存在时 OpenAI 优先。
-- [x] 以 `dc163c4` 修复 `process.env` 类型兼容，并在当前 HEAD 新鲜通过 lint、165 项 Vitest、6 项 Playwright E2E 和 production build。
+- [x] 以 `5885fbe` 修复 MiMo Responses 兼容路径：`json_object`、raw `output_text` JSON 解析、本地 Zod/domain validation 与一次安全 repair retry；OpenAI strict parse 保持原行为。
+- [x] 首页强制动态渲染；新鲜 production build 路由表显示 `ƒ /`，运行时环境决定 provider label。
+- [x] 在当前 HEAD 新鲜通过 lint、169 项 Vitest、6 项获批非沙箱 Playwright E2E 和 production build。
 - [x] 使用官方 npm registry 完成生产依赖审计；确认 2 个 moderate（Next → PostCSS）且 `No fix available`，保留为已知上游风险，不修改依赖。
 - [ ] 在服务器安全设置 `MIMO_API_KEY`；不得把任何密钥写入仓库、命令参数、截图或聊天记录。
 - [ ] 取得准确的 systemd unit 名称，使用 root 可读环境文件和 drop-in 注入密钥后重启该服务。
@@ -51,7 +53,7 @@ Phase 3：本地 MiMo 验证完成，准备服务器配置与 live non-demo 验�
 | Decision | Rationale |
 |----------|-----------|
 | 使用 Azure VM + Nginx + systemd | 当前部署已经完成并具有 HTTPS 公网入口 |
-| fallback 不视为完整上线 | 固定 fallback 只能保障演示路径，不能证明任意材料的 GPT-5.6 功能 |
+| fallback 不视为完整上线 | 固定 fallback 只能保障演示路径，不能证明任意材料的 live provider 功能 |
 | 密钥只在服务器端注入 | 防止进入 Git、浏览器包、日志或聊天记录 |
 
 ## Errors Encountered
@@ -62,4 +64,5 @@ Phase 3：本地 MiMo 验证完成，准备服务器配置与 live non-demo 验�
 | MiMo 初次 production build 在 `provider.ts:22` 类型检查失败 | 1 | `dc163c4` 修复环境对象结构类型；当前 HEAD build exit 0 |
 | 沙箱内 Playwright 6 项用例结束后无法回收 Windows webServer | 1 | 获批非沙箱运行自然退出，6/6 通过；未将沙箱超时视为项目失败 |
 | 默认镜像不实现 npm audit endpoint | 1 | 改用官方 registry 验证：2 moderate，No fix available |
+| final-fix 首次 build 在 `client.ts` 拒绝 raw response 类型 | 1 | 将 refusal helper 参数收窄为它实际读取的可选 `output`；重跑 build exit 0 且首页为 dynamic |
 
