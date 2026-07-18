@@ -431,6 +431,7 @@ it("uses bounded low reasoning for MiMo JSON object output", async () => {
   expect(create).toHaveBeenCalledTimes(1);
   expect(validate).toHaveBeenCalledWith({ value: "ok" });
   const request = create.mock.calls[0]?.[0];
+  const expectedJsonSchema = JSON.stringify(z.toJSONSchema(Output));
   expect(request).toMatchObject({
     model: "mimo-v2.5",
     reasoning: { effort: "low" },
@@ -439,6 +440,14 @@ it("uses bounded low reasoning for MiMo JSON object output", async () => {
     input: options.input,
     text: { format: { type: "json_object" } },
   });
+  expect(request.instructions).toBe(
+    [
+      options.instructions,
+      "Return exactly one JSON object and no surrounding text.",
+      "The JSON object must match this exact JSON Schema:",
+      expectedJsonSchema,
+    ].join("\n\n"),
+  );
   expect(request.instructions).not.toContain(options.input);
   expect(request).not.toHaveProperty("store");
   expect(request).not.toHaveProperty("safety_identifier");
