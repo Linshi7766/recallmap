@@ -106,3 +106,42 @@ it("uses RecallMap across current public project surfaces", () => {
   expect(packageLock.name).toBe("recallmap");
   expect(packageLock.packages[""].name).toBe("recallmap");
 });
+
+it("keeps the bilingual demo package ready to record", () => {
+  const demoScript = readFileSync("docs/demo-script.md", "utf8");
+  const recordingGuide = readFileSync("docs/demo-recording-guide.md", "utf8");
+  const englishSections = [
+    ...demoScript.matchAll(
+      /\*\*English narration\*\*\s*\n\n([\s\S]*?)\n\n\*\*中文对照\*\*/g,
+    ),
+  ].map((match) => match[1]!.trim());
+  const englishWordCount = englishSections
+    .join(" ")
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+  expect(englishSections).toHaveLength(8);
+  expect(englishWordCount).toBeGreaterThanOrEqual(260);
+  expect(englishWordCount).toBeLessThanOrEqual(330);
+  expect(demoScript.match(/\*\*中文对照\*\*/g)).toHaveLength(8);
+  expect(demoScript).toContain("Live analysis — wait removed");
+  expect(demoScript).toContain(
+    "The current public deployment uses Xiaomi MiMo V2.5 through an OpenAI-compatible Responses API.",
+  );
+  expect(demoScript).toContain(
+    "GPT-5.6 is supported through the OpenAI Responses API when `OPENAI_API_KEY` is configured",
+  );
+  expect(demoScript).toContain(
+    "Codex was the development tool, not the runtime tutor.",
+  );
+  expect(recordingGuide).toContain(
+    "If two variables consistently move together, one probably causes the other unless the data has an error.",
+  );
+  expect(recordingGuide).toContain(
+    "Correlation shows that variables move together, but it does not reveal why.",
+  );
+  expect(recordingGuide).toContain("1920×1080");
+  expect(recordingGuide).toContain(
+    "No API keys, Azure account details, or personal email",
+  );
+});

@@ -149,7 +149,7 @@ Expected: all repository-hygiene tests pass, including eight bilingual sections 
 Run:
 
 ```powershell
-$text = Get-Content -Raw -LiteralPath 'docs\demo-script.md'
+$text = Get-Content -Raw -Encoding utf8 -LiteralPath 'docs\demo-script.md'
 $sections = [regex]::Matches($text, '\*\*English narration\*\*\s*\r?\n\r?\n([\s\S]*?)\r?\n\r?\n\*\*中文对照\*\*')
 $spoken = ($sections | ForEach-Object { $_.Groups[1].Value.Trim() }) -join ' '
 "SECTIONS=$($sections.Count) WORDS=$(($spoken -split '\s+' | Where-Object { $_ }).Count)"
