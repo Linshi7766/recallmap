@@ -15,6 +15,9 @@ and remains safely below the three-minute limit.
 - Narration: the entrant's own English voice.
 - Production: separately recorded real product clips, edited into one concise
   walkthrough, with English subtitles.
+- Script format: each English narration passage is followed by an accurate
+  Chinese translation for comprehension and rehearsal. The Chinese translation
+  is not spoken and is not included in the final video's running time.
 - Remove live-model waiting time during editing. Show the caption
   `Live analysis — wait removed` at the cut so the edit remains transparent.
 
@@ -76,8 +79,9 @@ claim an unrecorded live browser validation.
 
 The recording package will contain:
 
-1. an English narration script that can be read verbatim;
-2. a timestamped shot and interaction list;
+1. a bilingual script with verbatim English narration and line-matched Chinese
+   translation;
+2. a bilingual timestamped shot and interaction list;
 3. the exact first and revised explanations to paste; and
 4. a recording, editing, privacy, and upload checklist.
 
@@ -88,5 +92,7 @@ The recording package will contain:
 - The reasoning map appears within the first minute.
 - The repaired Before/After result appears by 2:20.
 - The voice is intelligible and subtitles match the narration.
+- Every English narration passage has a faithful Chinese reference translation,
+  while the final video uses English narration and English subtitles only.
 - The Codex, MiMo V2.5, and optional GPT-5.6 roles are described accurately.
 - No credential or personal account information is visible or audible.
