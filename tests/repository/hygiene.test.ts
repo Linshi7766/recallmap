@@ -112,7 +112,7 @@ it("keeps the bilingual demo package ready to record", () => {
   const recordingGuide = readFileSync("docs/demo-recording-guide.md", "utf8");
   const englishSections = [
     ...demoScript.matchAll(
-      /\*\*English narration\*\*\s*\n\n([\s\S]*?)\n\n\*\*中文对照\*\*/g,
+      /\*\*English narration\*\*\s*\r?\n\r?\n([\s\S]*?)\r?\n\r?\n\*\*中文对照\*\*/g,
     ),
   ].map((match) => match[1]!.trim());
   const englishWordCount = englishSections
